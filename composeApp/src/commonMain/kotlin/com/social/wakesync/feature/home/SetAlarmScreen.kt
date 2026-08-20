@@ -73,7 +73,7 @@ import com.social.wakesync.ui.utils.BackHandler
 @Composable
 fun SetAlarmScreen(
     onBack: () -> Unit,
-    onSave: (hour: Int, minute: Int, isAm: Boolean, days: List<Int>, mode: String, challenge: String, partnerUsername: String?) -> Unit,
+    onSave: (hour: Int, minute: Int, isAm: Boolean, days: List<Int>, mode: String, challenge: String, partnerUsername: String?, bondName: String?) -> Unit,
     titleFamily: FontFamily,
     interFamily: FontFamily,
     sounds: List<SoundMetadata> = emptyList(),
@@ -92,6 +92,7 @@ fun SetAlarmScreen(
     var selectedMathDifficulty by remember { mutableStateOf("Medium") }
     val selectedDays = remember { mutableStateListOf(0, 1, 2, 3, 4) }
     var selectedPenalty by remember { mutableStateOf("shame") }
+    var bondName by remember { mutableStateOf("") }
 
     // Duo / Group User Search Bottom Sheet State
     var showAddParticipantsSheet by remember { mutableStateOf(false) }
@@ -315,6 +316,54 @@ fun SetAlarmScreen(
                         }
                         Text("➕", fontSize = 16.sp)
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Bond/Group Name input
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = if (selectedMode == "Duo") "BOND NAME" else "GROUP NAME",
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = interFamily,
+                            letterSpacing = 1.sp
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(AppColorPalette.Surface)
+                                .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.dp))
+                                .padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.TextField(
+                                value = bondName,
+                                onValueChange = { bondName = it },
+                                placeholder = {
+                                    Text(
+                                        text = if (selectedMode == "Duo") "Name your duo bond (e.g. Dream Team)" else "Name your group (e.g. Rise & Grind)",
+                                        color = Color.White.copy(alpha = 0.2f),
+                                        fontFamily = interFamily,
+                                        fontSize = 14.sp
+                                    )
+                                },
+                                colors = androidx.compose.material3.TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = AppColorPalette.CyanCta,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -445,7 +494,8 @@ fun SetAlarmScreen(
                             selectedDays.toList(),
                             selectedMode,
                             selectedChallenge,
-                            selectedParticipants.joinToString(",")
+                            selectedParticipants.joinToString(","),
+                            if (selectedMode != "Solo" && bondName.isNotBlank()) bondName else null
                         )
                         onBack()
                     },

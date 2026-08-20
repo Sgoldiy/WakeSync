@@ -216,6 +216,7 @@ class AndroidHomeRepository : HomeRepository {
             if (!snapshot.exists()) return Result.failure(Exception("Habit not found"))
             
             val partnerUsername = snapshot.getString("partnerUsername") ?: ""
+            val bondName = snapshot.getString("bondName") ?: ""
             val currentStreak = snapshot.getLong("streak")?.toInt() ?: 0
             
             if (partnerUsername.isBlank()) {
@@ -270,6 +271,31 @@ class AndroidHomeRepository : HomeRepository {
                             .await()
                     }
                 }
+
+                // 5. Update centralized bond stats
+                if (bondName.isNotBlank()) {
+                    val bondId = "bond_${(allUsernames.sorted().joinToString(",") + "_" + bondName).hashCode()}"
+                    val bondRef = db.collection("bonds").document(bondId)
+                    
+                    if (allCompleted) {
+                        db.runTransaction { transaction ->
+                            val bondSnap = transaction.get(bondRef)
+                            if (bondSnap.exists()) {
+                                val streak = bondSnap.getLong("habitStreak")?.toInt() ?: 0
+                                val wins = bondSnap.getLong("habitWins")?.toInt() ?: 0
+                                transaction.update(bondRef, "habitStreak", streak + 1, "habitWins", wins + 1)
+                            }
+                        }.await()
+                    } else if (!isDone) {
+                        db.runTransaction { transaction ->
+                            val bondSnap = transaction.get(bondRef)
+                            if (bondSnap.exists()) {
+                                val losses = bondSnap.getLong("habitLosses")?.toInt() ?: 0
+                                transaction.update(bondRef, "habitStreak", 0, "habitLosses", losses + 1)
+                            }
+                        }.await()
+                    }
+                }
             }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -314,13 +340,18 @@ class AndroidHomeRepository : HomeRepository {
                         "timestamp" to alarm.timestamp,
                         "isEnabled" to true,
                         "soundUrl" to (alarm.soundUrl ?: ""),
-                        "createdAt" to com.google.firebase.Timestamp.now()
+                        "createdAt" to com.google.firebase.Timestamp.now(),
+                        "bondName" to (alarm.bondName ?: "")
                     )
                     
                     db.collection("duo_alarms")
                         .document(addedDoc.id)
                         .set(duoData)
                         .await()
+
+                    if (!alarm.bondName.isNullOrBlank()) {
+                        checkAndCreateBond(alarm.bondName, alarm.mode, user.uid, alarm.partnerUsername)
+                    }
 
                     // Cross-Device Cross-Platform Sync: Find partners in Firebase by username and push alarm to their accounts
                     try {
@@ -637,7 +668,8 @@ class AndroidHomeRepository : HomeRepository {
                 "streak" to habit.streak,
                 "frequency" to habit.frequency,
                 "reminderTime" to habit.reminderTime,
-                "partnerUsername" to partnerUsernames
+                "partnerUsername" to partnerUsernames,
+                "bondName" to (habit.bondName ?: "")
             )
             
             db.collection("users")
@@ -663,6 +695,15 @@ class AndroidHomeRepository : HomeRepository {
                             .await()
                     }
                 }
+            }
+
+            if (!habit.bondName.isNullOrBlank()) {
+                checkAndCreateBond(
+                    habit.bondName,
+                    if (habit.partnerUsername.isNullOrBlank()) "Solo" else if (habit.partnerUsername.contains(",")) "Group" else "Duo",
+                    user.uid,
+                    habit.partnerUsername
+                )
             }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -734,7 +775,8 @@ class AndroidHomeRepository : HomeRepository {
                 "streak" to habit.streak,
                 "frequency" to habit.frequency,
                 "reminderTime" to habit.reminderTime,
-                "partnerUsername" to partnerUsernames
+                "partnerUsername" to partnerUsernames,
+                "bondName" to (habit.bondName ?: "")
             )
 
             db.collection("users")
@@ -760,6 +802,15 @@ class AndroidHomeRepository : HomeRepository {
                             .await()
                     }
                 }
+            }
+
+            if (!habit.bondName.isNullOrBlank()) {
+                checkAndCreateBond(
+                    habit.bondName,
+                    if (habit.partnerUsername.isNullOrBlank()) "Solo" else if (habit.partnerUsername.contains(",")) "Group" else "Duo",
+                    user.uid,
+                    habit.partnerUsername
+                )
             }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -834,9 +885,87 @@ class AndroidHomeRepository : HomeRepository {
                 
                 transaction.update(userDoc, updates)
             }.await()
+
+            // Update centralized bond stats if named Duo/Group alarm
+            try {
+                val alarmSnapshot = db.collection("users")
+                    .document(user.uid)
+                    .collection("alarms")
+                    .document(alarmId)
+                    .get()
+                    .await()
+                    
+                val bondName = alarmSnapshot.getString("bondName") ?: ""
+                val partnerUsername = alarmSnapshot.getString("partnerUsername") ?: ""
+                
+                if (bondName.isNotBlank()) {
+                    val currentUserDoc = userDoc.get().await()
+                    val currentUsername = currentUserDoc.getString("username") ?: ""
+                    val allUsernames = (if (partnerUsername.isNotBlank()) partnerUsername.split(",").map { it.trim() } else emptyList()) + currentUsername
+                    val members = allUsernames.sorted()
+                    val bondId = "bond_${(members.joinToString(",") + "_" + bondName).hashCode()}"
+                    val bondRef = db.collection("bonds").document(bondId)
+                    
+                    db.runTransaction { transaction ->
+                        val bondSnap = transaction.get(bondRef)
+                        if (bondSnap.exists()) {
+                            val streak = bondSnap.getLong("alarmStreak")?.toInt() ?: 0
+                            val wins = bondSnap.getLong("alarmWins")?.toInt() ?: 0
+                            val losses = bondSnap.getLong("alarmLosses")?.toInt() ?: 0
+                            
+                            val updates = hashMapOf<String, Any>()
+                            if (isWin) {
+                                updates["alarmStreak"] = streak + 1
+                                updates["alarmWins"] = wins + 1
+                            } else {
+                                updates["alarmStreak"] = 0
+                                updates["alarmLosses"] = losses + 1
+                            }
+                            transaction.update(bondRef, updates)
+                        }
+                    }.await()
+                }
+            } catch (e: Exception) {
+                // Fail silently
+            }
+
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    private suspend fun checkAndCreateBond(bondName: String, mode: String, creatorUid: String, partnerUsername: String?) {
+        try {
+            val currentUserDoc = db.collection("users").document(creatorUid).get().await()
+            val currentUsername = currentUserDoc.getString("username") ?: ""
+            
+            val partners = partnerUsername ?: ""
+            val allUsernames = if (partners.isNotBlank()) {
+                partners.split(",").map { it.trim() } + currentUsername
+            } else listOf(currentUsername)
+            
+            val members = allUsernames.sorted()
+            val bondId = "bond_${(members.joinToString(",") + "_" + bondName).hashCode()}"
+            val bondRef = db.collection("bonds").document(bondId)
+            
+            val snapshot = bondRef.get().await()
+            if (!snapshot.exists()) {
+                val bondMap = hashMapOf(
+                    "name" to bondName,
+                    "type" to mode,
+                    "members" to members,
+                    "alarmStreak" to 0,
+                    "alarmWins" to 0,
+                    "alarmLosses" to 0,
+                    "habitStreak" to 0,
+                    "habitWins" to 0,
+                    "habitLosses" to 0
+                )
+                bondRef.set(bondMap).await()
+            }
+        } catch (e: Exception) {
+            // fail silently
         }
     }
 }

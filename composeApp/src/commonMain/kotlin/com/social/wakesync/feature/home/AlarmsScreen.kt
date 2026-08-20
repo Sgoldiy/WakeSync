@@ -74,8 +74,8 @@ fun AlarmsScreen(
     if (showSetAlarmScreen) {
         SetAlarmScreen(
             onBack = { showSetAlarmScreen = false },
-            onSave = { hour, minute, isAm, days, mode, challenge, partnerUsername ->
-                viewModel.addAlarm(hour, minute, isAm, days, mode, challenge, partnerUsername)
+            onSave = { hour, minute, isAm, days, mode, challenge, partnerUsername, bondName ->
+                viewModel.addAlarm(hour, minute, isAm, days, mode, challenge, partnerUsername, bondName)
             },
             titleFamily = titleFamily,
             interFamily = interFamily,

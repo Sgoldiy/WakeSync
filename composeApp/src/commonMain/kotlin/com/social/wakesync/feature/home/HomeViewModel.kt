@@ -70,7 +70,8 @@ data class Habit(
     val streak: Int = 0,
     val frequency: String = "Daily",
     val reminderTime: String = "6:15 AM",
-    val partnerUsername: String? = null
+    val partnerUsername: String? = null,
+    val bondName: String? = null
 )
 
 enum class HabitIconType {
@@ -407,7 +408,8 @@ class HomeViewModel : ViewModel() {
         days: List<Int>,
         mode: String,
         challenge: String,
-        partnerUsername: String? = null
+        partnerUsername: String? = null,
+        bondName: String? = null
     ) {
         viewModelScope.launch {
             val hour24 = if (isAm) {
@@ -433,7 +435,8 @@ class HomeViewModel : ViewModel() {
                 soundUrl = selectedSound?.url,
                 soundName = selectedSound?.name ?: "Default",
                 soundId = selectedSound?.id,
-                partnerUsername = partnerUsername
+                partnerUsername = partnerUsername,
+                bondName = bondName
             )
             
             homeRepository.addAlarm(alarm)
@@ -510,7 +513,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun addHabit(title: String, icon: HabitIconType, frequency: String, reminderTime: String, partnerUsername: String?) {
+    fun addHabit(title: String, icon: HabitIconType, frequency: String, reminderTime: String, partnerUsername: String?, bondName: String? = null) {
         viewModelScope.launch {
             val newHabit = Habit(
                 id = "",
@@ -520,7 +523,8 @@ class HomeViewModel : ViewModel() {
                 streak = 0,
                 frequency = frequency,
                 reminderTime = reminderTime,
-                partnerUsername = partnerUsername
+                partnerUsername = partnerUsername,
+                bondName = bondName
             )
             homeRepository.addHabit(newHabit)
         }
@@ -536,7 +540,8 @@ class HomeViewModel : ViewModel() {
                 streak = 0,
                 frequency = "Daily",
                 reminderTime = "6:15 AM",
-                partnerUsername = null
+                partnerUsername = null,
+                bondName = null
             )
             homeRepository.addHabit(suggestedHabit)
         }
@@ -548,7 +553,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun updateHabit(id: String, title: String, icon: HabitIconType, frequency: String, reminderTime: String, partnerUsername: String?) {
+    fun updateHabit(id: String, title: String, icon: HabitIconType, frequency: String, reminderTime: String, partnerUsername: String?, bondName: String? = null) {
         viewModelScope.launch {
             val current = _uiState.value.habits.find { it.id == id }
             val finalHabit = current?.copy(
@@ -556,7 +561,8 @@ class HomeViewModel : ViewModel() {
                 iconType = icon,
                 frequency = frequency,
                 reminderTime = reminderTime,
-                partnerUsername = partnerUsername
+                partnerUsername = partnerUsername,
+                bondName = bondName
             ) ?: Habit(
                 id = id,
                 title = title,
@@ -565,7 +571,8 @@ class HomeViewModel : ViewModel() {
                 streak = 0,
                 frequency = frequency,
                 reminderTime = reminderTime,
-                partnerUsername = partnerUsername
+                partnerUsername = partnerUsername,
+                bondName = bondName
             )
             homeRepository.updateHabit(finalHabit)
         }

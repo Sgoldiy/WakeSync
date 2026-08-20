@@ -28,7 +28,7 @@ import com.social.wakesync.ui.utils.BackHandler
 fun AddHabitScreen(
     habit: Habit? = null,
     onBack: () -> Unit,
-    onSave: (title: String, icon: HabitIconType, frequency: String, reminderTime: String, partnerUsername: String?) -> Unit,
+    onSave: (title: String, icon: HabitIconType, frequency: String, reminderTime: String, partnerUsername: String?, bondName: String?) -> Unit,
     friends: List<Friend>,
     titleFamily: FontFamily,
     interFamily: FontFamily,
@@ -42,6 +42,7 @@ fun AddHabitScreen(
     var reminderTime by remember { mutableStateOf(habit?.reminderTime ?: "6:15 AM") }
     var isAccountabilityEnabled by remember { mutableStateOf(habit?.partnerUsername?.isNotBlank() == true) }
     var selectedPartnerUsername by remember { mutableStateOf<String?>(habit?.partnerUsername) }
+    var bondName by remember { mutableStateOf(habit?.bondName ?: "") }
     
     // Set default partner if list is not empty
     LaunchedEffect(friends) {
@@ -362,6 +363,54 @@ fun AddHabitScreen(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Bond/Group Name input
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "BOND / GROUP NAME",
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = interFamily,
+                                letterSpacing = 1.sp
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(AppColorPalette.Surface)
+                                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.dp))
+                                    .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                androidx.compose.material3.TextField(
+                                    value = bondName,
+                                    onValueChange = { bondName = it },
+                                    placeholder = {
+                                        Text(
+                                            text = "Name your bond (e.g. Accountability Squad)",
+                                            color = Color.White.copy(alpha = 0.2f),
+                                            fontFamily = interFamily,
+                                            fontSize = 14.sp
+                                        )
+                                    },
+                                    colors = androidx.compose.material3.TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        cursorColor = AppColorPalette.CyanCta,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent
+                                    ),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -371,7 +420,8 @@ fun AddHabitScreen(
                 onClick = {
                     if (title.isNotBlank()) {
                         val partner = if (isAccountabilityEnabled) selectedPartnerUsername else null
-                        onSave(title, selectedIcon, selectedFrequency, reminderTime, partner)
+                        val name = if (isAccountabilityEnabled && bondName.isNotBlank()) bondName else null
+                        onSave(title, selectedIcon, selectedFrequency, reminderTime, partner, name)
                     }
                 },
                 enabled = title.isNotBlank(),

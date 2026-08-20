@@ -162,8 +162,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
         AddHabitScreen(
             habit = editingHabit,
             onBack = { editingHabit = null },
-            onSave = { title, icon, frequency, reminderTime, partnerUsername ->
-                viewModel.updateHabit(editingHabit!!.id, title, icon, frequency, reminderTime, partnerUsername)
+            onSave = { title, icon, frequency, reminderTime, partnerUsername, bondName ->
+                viewModel.updateHabit(editingHabit!!.id, title, icon, frequency, reminderTime, partnerUsername, bondName)
                 editingHabit = null
                 activeHabit = null
             },
@@ -189,8 +189,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
     } else if (showAddHabitScreen) {
         AddHabitScreen(
             onBack = { showAddHabitScreen = false },
-            onSave = { title, icon, frequency, reminderTime, partnerUsername ->
-                viewModel.addHabit(title, icon, frequency, reminderTime, partnerUsername)
+            onSave = { title, icon, frequency, reminderTime, partnerUsername, bondName ->
+                viewModel.addHabit(title, icon, frequency, reminderTime, partnerUsername, bondName)
                 showAddHabitScreen = false
             },
             friends = uiState.friends,
@@ -200,8 +200,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
     } else if (showSetAlarmScreen) {
         SetAlarmScreen(
             onBack = { showSetAlarmScreen = false },
-            onSave = { hour, minute, isAm, days, mode, challenge, partnerUsername ->
-                viewModel.addAlarm(hour, minute, isAm, days, mode, challenge, partnerUsername)
+            onSave = { hour, minute, isAm, days, mode, challenge, partnerUsername, bondName ->
+                viewModel.addAlarm(hour, minute, isAm, days, mode, challenge, partnerUsername, bondName)
             },
             titleFamily = titleFamily,
             interFamily = interFamily,

@@ -48,7 +48,8 @@ data class AlarmData(
     val soundId: String? = null,
     val partnerUid: String? = null, // For Duo/Group shared alarm synchronization
     val partnerUsername: String? = null, // Username of tagged partner (e.g. maya.rises)
-    val mathDifficulty: String = "Medium" // "Easy" (1 q), "Medium" (2 q), "Hard" (3 q)
+    val mathDifficulty: String = "Medium", // "Easy" (1 q), "Medium" (2 q), "Hard" (3 q)
+    val bondName: String? = null
 )
 
 data class HomeStats(
