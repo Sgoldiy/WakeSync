@@ -1,0 +1,614 @@
+package com.social.wakesync.feature.home
+
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.social.wakesync.FIRESTORE_DATABASE_ID
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
+
+class AndroidHomeRepository : HomeRepository {
+    private val db = FirebaseFirestore.getInstance(FIRESTORE_DATABASE_ID)
+    private val auth = FirebaseAuth.getInstance()
+
+    override fun getHabits(): Flow<List<Habit>> = callbackFlow {
+        val user = auth.currentUser
+        if (user == null) {
+            trySend(emptyList())
+            return@callbackFlow
+        }
+
+        val subscription = db.collection("users")
+            .document(user.uid)
+            .collection("habits")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                val habits = snapshot?.documents?.mapNotNull { doc ->
+                    val title = doc.getString("title") ?: return@mapNotNull null
+                    val isDone = doc.getBoolean("isDone") ?: false
+                    val iconTypeStr = doc.getString("iconType") ?: "RUN"
+                    val iconType = try { HabitIconType.valueOf(iconTypeStr) } catch (e: Exception) { HabitIconType.RUN }
+                    val streak = doc.getLong("streak")?.toInt() ?: 0
+                    val frequency = doc.getString("frequency") ?: "Daily"
+                    val reminderTime = doc.getString("reminderTime") ?: "6:15 AM"
+                    val partnerUsername = doc.getString("partnerUsername")
+                    
+                    Habit(doc.id, title, iconType, isDone, streak, frequency, reminderTime, partnerUsername)
+                } ?: emptyList()
+                
+                trySend(habits)
+            }
+
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getStats(): Flow<HomeStats> = callbackFlow {
+        val user = auth.currentUser
+        if (user == null) {
+            trySend(HomeStats(0, 0, 0, "-"))
+            return@callbackFlow
+        }
+
+        val subscription = db.collection("users")
+            .document(user.uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && snapshot.exists()) {
+                    val streak = snapshot.getLong("streak")?.toInt() ?: 0
+                    val wins = snapshot.getLong("wins")?.toInt() ?: 0
+                    val losses = snapshot.getLong("losses")?.toInt() ?: 0
+                    val rank = snapshot.getString("rank") ?: "-"
+                    
+                    trySend(HomeStats(streak, wins, losses, rank))
+                }
+            }
+
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getFriends(): Flow<List<Friend>> = callbackFlow {
+        val subscription = db.collection("users")
+            .orderBy("streak", Query.Direction.DESCENDING)
+            .limit(10)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                val currentUserId = auth.currentUser?.uid
+                val friends = snapshot?.documents?.filter { it.id != currentUserId }?.mapNotNull { doc ->
+                    val name = doc.getString("username") ?: return@mapNotNull null
+                    val avatar = doc.getString("avatar") ?: "👤"
+                    val streak = doc.getLong("streak")?.toInt() ?: 0
+                    // Status mapping would ideally come from a more complex logic, 
+                    // for now we use a default based on streak activity or similar.
+                    val status = FriendStatus.ACTIVE 
+                    
+                    Friend(doc.id, name, avatar, streak, status)
+                } ?: emptyList()
+
+                trySend(friends)
+            }
+
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getAlarms(): Flow<List<AlarmData>> = callbackFlow {
+        val user = auth.currentUser
+        if (user == null) {
+            trySend(emptyList())
+            return@callbackFlow
+        }
+
+        val subscription = db.collection("users")
+            .document(user.uid)
+            .collection("alarms")
+            .orderBy("time", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                val alarms = snapshot?.documents?.mapNotNull { doc ->
+                    AlarmData(
+                        id = doc.id,
+                        time = doc.getString("time") ?: "00:00",
+                        label = doc.getString("label") ?: "Alarm",
+                        days = (doc.get("days") as? List<*>)?.mapNotNull { (it as? Long)?.toInt() } ?: emptyList(),
+                        isEnabled = doc.getBoolean("isEnabled") ?: true,
+                        mode = doc.getString("mode") ?: "Solo",
+                        challenge = doc.getString("challenge") ?: "Math",
+                        isGroup = doc.getBoolean("isGroup") ?: false,
+                        timestamp = doc.getLong("timestamp") ?: 0L,
+                        soundUrl = doc.getString("soundUrl"),
+                        soundName = doc.getString("soundName") ?: "Default",
+                        soundId = doc.getString("soundId"),
+                        partnerUid = doc.getString("partnerUid")
+                    )
+                } ?: emptyList()
+                trySend(alarms)
+            }
+
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getNextAlarm(): Flow<AlarmData?> = callbackFlow {
+        val user = auth.currentUser
+        if (user == null) {
+            trySend(null)
+            return@callbackFlow
+        }
+
+        val subscription = db.collection("users")
+            .document(user.uid)
+            .collection("alarms")
+            .whereEqualTo("isEnabled", true)
+            .whereGreaterThan("timestamp", System.currentTimeMillis())
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .limit(1)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                val alarm = snapshot?.documents?.firstOrNull()?.let { doc ->
+                    AlarmData(
+                        id = doc.id,
+                        time = doc.getString("time") ?: "00:00",
+                        label = doc.getString("label") ?: "Alarm",
+                        days = (doc.get("days") as? List<*>)?.mapNotNull { (it as? Long)?.toInt() } ?: emptyList(),
+                        isEnabled = doc.getBoolean("isEnabled") ?: true,
+                        mode = doc.getString("mode") ?: "Solo",
+                        challenge = doc.getString("challenge") ?: "Math",
+                        isGroup = doc.getBoolean("isGroup") ?: false,
+                        timestamp = doc.getLong("timestamp") ?: 0L,
+                        soundUrl = doc.getString("soundUrl"),
+                        soundName = doc.getString("soundName") ?: "Default",
+                        soundId = doc.getString("soundId"),
+                        partnerUid = doc.getString("partnerUid")
+                    )
+                }
+                trySend(alarm)
+            }
+
+        awaitClose { subscription.remove() }
+    }
+
+    override suspend fun toggleHabit(habitId: String, isDone: Boolean): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            val habitRef = db.collection("users")
+                .document(user.uid)
+                .collection("habits")
+                .document(habitId)
+                
+            val snapshot = habitRef.get().await()
+            val currentStreak = snapshot.getLong("streak")?.toInt() ?: 0
+            val newStreak = if (isDone) currentStreak + 1 else maxOf(0, currentStreak - 1)
+            
+            habitRef.update(
+                "isDone", isDone,
+                "streak", newStreak
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun addAlarm(alarm: AlarmData): Result<Unit> {
+        return try {
+            val user = auth.currentUser
+            val alarmWithId = alarm.copy(id = if (alarm.id.isBlank()) "alarm_${System.currentTimeMillis()}" else alarm.id)
+
+            if (alarm.mode == "Solo") {
+                // Solo alarms save directly to local user collection for 100% offline & local priority
+                if (user != null) {
+                    db.collection("users")
+                        .document(user.uid)
+                        .collection("alarms")
+                        .document(alarmWithId.id)
+                        .set(alarmWithId)
+                        .await()
+                }
+            } else {
+                // Duo and Group alarms sync directly to Firebase Firestore across shared collections
+                if (user != null) {
+                    val addedDoc = db.collection("users")
+                        .document(user.uid)
+                        .collection("alarms")
+                        .add(alarm.copy(id = ""))
+                        .await()
+
+                    val duoData = hashMapOf(
+                        "createdBy" to user.uid,
+                        "creatorName" to (user.displayName ?: "Partner"),
+                        "partnerUsername" to (alarm.partnerUsername ?: ""),
+                        "time" to alarm.time,
+                        "label" to alarm.label,
+                        "days" to alarm.days,
+                        "mode" to alarm.mode,
+                        "challenge" to alarm.challenge,
+                        "mathDifficulty" to alarm.mathDifficulty,
+                        "timestamp" to alarm.timestamp,
+                        "isEnabled" to true,
+                        "soundUrl" to (alarm.soundUrl ?: ""),
+                        "createdAt" to com.google.firebase.Timestamp.now()
+                    )
+                    
+                    db.collection("duo_alarms")
+                        .document(addedDoc.id)
+                        .set(duoData)
+                        .await()
+
+                    // Cross-Device Cross-Platform Sync: Find partners in Firebase by username and push alarm to their accounts
+                    try {
+                        val targetUsername = alarm.partnerUsername
+                        val partnerQuery = if (!targetUsername.isNullOrBlank()) {
+                            val usernamesList = targetUsername.split(",")
+                            db.collection("users")
+                                .whereIn("username", usernamesList)
+                                .get()
+                                .await()
+                        } else {
+                            db.collection("users").get().await()
+                        }
+
+                        val partnerDocs = partnerQuery.documents.filter { it.id != user.uid }
+                        partnerDocs.forEach { partnerDoc ->
+                            db.collection("users")
+                                .document(partnerDoc.id)
+                                .collection("alarms")
+                                .document(addedDoc.id)
+                                .set(alarm.copy(id = addedDoc.id, partnerUid = user.uid))
+                                .await()
+                        }
+                    } catch (e: Exception) {
+                        // Fail gracefully if partner lookup fails
+                    }
+                }
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateAlarm(alarm: AlarmData): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            db.collection("users")
+                .document(user.uid)
+                .collection("alarms")
+                .document(alarm.id)
+                .set(alarm)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun toggleAlarm(alarmId: String, isEnabled: Boolean): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            
+            // 1. Update own alarm subcollection
+            db.collection("users")
+                .document(user.uid)
+                .collection("alarms")
+                .document(alarmId)
+                .update("isEnabled", isEnabled)
+                .await()
+                
+            // 2. Query alarm to propagate to partners
+            val alarmDoc = db.collection("users")
+                .document(user.uid)
+                .collection("alarms")
+                .document(alarmId)
+                .get()
+                .await()
+                
+            val partnerUsername = alarmDoc.getString("partnerUsername")
+            val mode = alarmDoc.getString("mode") ?: "Solo"
+            
+            if (mode != "Solo" && !partnerUsername.isNullOrBlank()) {
+                // Update shared duo_alarm doc status
+                try {
+                    db.collection("duo_alarms")
+                        .document(alarmId)
+                        .update("isEnabled", isEnabled)
+                        .await()
+                } catch (_: Exception) {}
+
+                // Propagate status change to partners' alarms lists
+                try {
+                    val usernamesList = partnerUsername.split(",")
+                    val partnerQuery = db.collection("users")
+                        .whereIn("username", usernamesList)
+                        .get()
+                        .await()
+                        
+                    val partnerDocs = partnerQuery.documents.filter { it.id != user.uid }
+                    partnerDocs.forEach { partnerDoc ->
+                        db.collection("users")
+                            .document(partnerDoc.id)
+                            .collection("alarms")
+                            .document(alarmId)
+                            .update("isEnabled", isEnabled)
+                            .await()
+                    }
+                } catch (_: Exception) {}
+            }
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun deleteAlarm(alarmId: String): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            
+            // 1. Query alarm details to retrieve partner information before deletion
+            val alarmDoc = db.collection("users")
+                .document(user.uid)
+                .collection("alarms")
+                .document(alarmId)
+                .get()
+                .await()
+                
+            val partnerUsername = alarmDoc.getString("partnerUsername")
+            val mode = alarmDoc.getString("mode") ?: "Solo"
+            
+            // 2. Delete own alarm
+            db.collection("users")
+                .document(user.uid)
+                .collection("alarms")
+                .document(alarmId)
+                .delete()
+                .await()
+                
+            if (mode != "Solo" && !partnerUsername.isNullOrBlank()) {
+                // Delete shared duo_alarm doc
+                try {
+                    db.collection("duo_alarms")
+                        .document(alarmId)
+                        .delete()
+                        .await()
+                } catch (_: Exception) {}
+
+                // Propagate delete to partners' alarms lists
+                try {
+                    val usernamesList = partnerUsername.split(",")
+                    val partnerQuery = db.collection("users")
+                        .whereIn("username", usernamesList)
+                        .get()
+                        .await()
+                        
+                    val partnerDocs = partnerQuery.documents.filter { it.id != user.uid }
+                    partnerDocs.forEach { partnerDoc ->
+                        db.collection("users")
+                            .document(partnerDoc.id)
+                            .collection("alarms")
+                            .document(alarmId)
+                            .delete()
+                            .await()
+                    }
+                } catch (_: Exception) {}
+            }
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getSoundCatalog(): Flow<List<SoundMetadata>> = callbackFlow {
+        val subscription = db.collection("sounds")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                val sounds = snapshot?.documents?.mapNotNull { doc ->
+                    SoundMetadata(
+                        id = doc.id,
+                        name = doc.getString("name") ?: "Unknown",
+                        url = doc.getString("url") ?: "",
+                        category = doc.getString("category") ?: "Solo"
+                    )
+                } ?: emptyList()
+                trySend(sounds)
+            }
+
+        awaitClose { subscription.remove() }
+    }
+
+    /**
+     * Helper to seed the database with initial sounds.
+     * You can call this once from MainActivity or a Debug menu.
+     */
+    override suspend fun seedSoundCatalog(): Result<Unit> {
+        return try {
+            val initialSounds = listOf(
+                SoundMetadata("neon_pulse", "Neon Pulse", "https://firebasestorage.googleapis.com/v0/b/wakesync-77f68.appspot.com/o/sounds%2Fneon_pulse.mp3?alt=media", "Solo"),
+                SoundMetadata("orbital_drift", "Orbital Drift", "https://firebasestorage.googleapis.com/v0/b/wakesync-77f68.appspot.com/o/sounds%2Forbital_drift.mp3?alt=media", "Chill"),
+                SoundMetadata("battle_horn", "Battle Horn", "https://firebasestorage.googleapis.com/v0/b/wakesync-77f68.appspot.com/o/sounds%2Fbattle_horn.mp3?alt=media", "Battle")
+            )
+
+            initialSounds.forEach { sound ->
+                db.collection("sounds").document(sound.id).set(sound).await()
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun searchUsersByUsername(query: String): Result<List<Friend>> {
+        return try {
+            val snapshot = if (query.isNotBlank()) {
+                db.collection("users")
+                    .whereGreaterThanOrEqualTo("username", query.trim())
+                    .whereLessThanOrEqualTo("username", query.trim() + "\uf8ff")
+                    .limit(10)
+                    .get()
+                    .await()
+            } else {
+                db.collection("users")
+                    .limit(10)
+                    .get()
+                    .await()
+            }
+
+            val currentUid = auth.currentUser?.uid
+            val friends = snapshot.documents.mapNotNull { doc ->
+                if (doc.id == currentUid) return@mapNotNull null
+                val username = doc.getString("username") ?: doc.getString("name") ?: doc.id
+                val avatar = doc.getString("avatar") ?: "👤"
+                val streak = doc.getLong("streak")?.toInt() ?: 0
+                Friend(
+                    id = doc.id,
+                    name = username,
+                    avatar = avatar,
+                    streak = streak,
+                    status = FriendStatus.ACTIVE
+                )
+            }
+            Result.success(friends)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getCurrentUserUid(): String? {
+        return auth.currentUser?.uid
+    }
+
+    override fun listenToDuoAlarm(alarmId: String): Flow<String?> = callbackFlow {
+        val subscription = db.collection("duo_alarms")
+            .document(alarmId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val winnerUid = snapshot?.getString("winnerUid")
+                trySend(winnerUid)
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override suspend fun setDuoAlarmWinner(alarmId: String, winnerUid: String): Result<Unit> {
+        return try {
+            db.collection("duo_alarms")
+                .document(alarmId)
+                .update("winnerUid", winnerUid)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun resetDuoAlarmWinner(alarmId: String): Result<Unit> {
+        return try {
+            db.collection("duo_alarms")
+                .document(alarmId)
+                .update("winnerUid", null)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            try {
+                db.collection("duo_alarms")
+                    .document(alarmId)
+                    .update("winnerUid", "")
+                    .await()
+                Result.success(Unit)
+            } catch (ex: Exception) {
+                Result.failure(ex)
+            }
+        }
+    }
+
+    override suspend fun addHabit(habit: Habit): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            val habitMap = hashMapOf(
+                "title" to habit.title,
+                "iconType" to habit.iconType.name,
+                "isDone" to habit.isDone,
+                "streak" to habit.streak,
+                "frequency" to habit.frequency,
+                "reminderTime" to habit.reminderTime,
+                "partnerUsername" to (habit.partnerUsername ?: "")
+            )
+            db.collection("users")
+                .document(user.uid)
+                .collection("habits")
+                .add(habitMap)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun deleteHabit(habitId: String): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            db.collection("users")
+                .document(user.uid)
+                .collection("habits")
+                .document(habitId)
+                .delete()
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateHabit(habit: Habit): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            val habitMap = hashMapOf(
+                "title" to habit.title,
+                "iconType" to habit.iconType.name,
+                "isDone" to habit.isDone,
+                "streak" to habit.streak,
+                "frequency" to habit.frequency,
+                "reminderTime" to habit.reminderTime,
+                "partnerUsername" to (habit.partnerUsername ?: "")
+            )
+            db.collection("users")
+                .document(user.uid)
+                .collection("habits")
+                .document(habit.id)
+                .set(habitMap)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}
+
+actual fun getHomeRepository(): HomeRepository = AndroidHomeRepository()

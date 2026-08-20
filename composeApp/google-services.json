@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1091584065305",
+    "project_id": "wakesync-a0d00",
+    "storage_bucket": "wakesync-a0d00.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1091584065305:android:8323e789a2c88f9f018f88",
+        "android_client_info": {
+          "package_name": "com.social.wakesync"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1091584065305-1bh8f6ieo6ic4uvknd1fr7vhb4sglqii.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.social.wakesync",
+            "certificate_hash": "8945ac137baf4f15a2c7a7ad9ed355b71326aca1"
+          }
+        },
+        {
+          "client_id": "1091584065305-294gjb6bq88hod7tdanafo2pk7q2lo1a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAv2WUOT1WAJTmBu-14RrW6cFyh63pnjqw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1091584065305-294gjb6bq88hod7tdanafo2pk7q2lo1a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1091584065305-r2v1poqbc9p0m8a2ts7q2k2rj3p5o4ka.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.social.wakesync"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
