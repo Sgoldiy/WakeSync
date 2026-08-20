@@ -23,6 +23,15 @@ data class HomeUiState(
     val wins: Int = 18,
     val losses: Int = 5,
     val rank: String = "#4",
+    val soloStreak: Int = 0,
+    val soloWins: Int = 0,
+    val soloLosses: Int = 0,
+    val duoStreak: Int = 0,
+    val duoWins: Int = 0,
+    val duoLosses: Int = 0,
+    val groupStreak: Int = 0,
+    val groupWins: Int = 0,
+    val groupLosses: Int = 0,
     val nextAlarmTime: String = "6:30 AM",
     val timeLeftToAlarm: String = "9h 14m",
     val isGroupAlarm: Boolean = true,
@@ -187,14 +196,21 @@ class HomeViewModel : ViewModel() {
 
         homeRepository.getStats()
             .onEach { stats ->
-                if (stats.streak > 0 || stats.wins > 0 || stats.losses > 0) {
-                    _uiState.update { it.copy(
-                        streak = stats.streak,
-                        wins = stats.wins,
-                        losses = stats.losses,
-                        rank = stats.rank
-                    ) }
-                }
+                _uiState.update { it.copy(
+                    streak = stats.streak,
+                    wins = stats.wins,
+                    losses = stats.losses,
+                    rank = stats.rank,
+                    soloStreak = stats.soloStreak,
+                    soloWins = stats.soloWins,
+                    soloLosses = stats.soloLosses,
+                    duoStreak = stats.duoStreak,
+                    duoWins = stats.duoWins,
+                    duoLosses = stats.duoLosses,
+                    groupStreak = stats.groupStreak,
+                    groupWins = stats.groupWins,
+                    groupLosses = stats.groupLosses
+                ) }
             }
             .launchIn(viewModelScope)
 
@@ -358,6 +374,18 @@ class HomeViewModel : ViewModel() {
     fun resetDuoAlarmWinner(alarmId: String) {
         viewModelScope.launch {
             homeRepository.resetDuoAlarmWinner(alarmId)
+        }
+    }
+
+    fun recordAlarmWin(alarmId: String, mode: String) {
+        viewModelScope.launch {
+            homeRepository.recordAlarmResult(alarmId, mode, true)
+        }
+    }
+
+    fun recordAlarmLoss(alarmId: String, mode: String) {
+        viewModelScope.launch {
+            homeRepository.recordAlarmResult(alarmId, mode, false)
         }
     }
 

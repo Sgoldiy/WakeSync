@@ -23,6 +23,7 @@ interface HomeRepository {
     suspend fun addHabit(habit: Habit): Result<Unit>
     suspend fun deleteHabit(habitId: String): Result<Unit>
     suspend fun updateHabit(habit: Habit): Result<Unit>
+    suspend fun recordAlarmResult(alarmId: String, mode: String, isWin: Boolean): Result<Unit>
 }
 
 data class SoundMetadata(
@@ -54,7 +55,16 @@ data class HomeStats(
     val streak: Int,
     val wins: Int,
     val losses: Int,
-    val rank: String
+    val rank: String,
+    val soloStreak: Int = 0,
+    val soloWins: Int = 0,
+    val soloLosses: Int = 0,
+    val duoStreak: Int = 0,
+    val duoWins: Int = 0,
+    val duoLosses: Int = 0,
+    val groupStreak: Int = 0,
+    val groupWins: Int = 0,
+    val groupLosses: Int = 0
 )
 
 expect fun getHomeRepository(): HomeRepository

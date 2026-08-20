@@ -114,11 +114,15 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                 alarmId = AlarmState.activeAlarmId,
                 currentUserId = viewModel.getCurrentUserUid(),
                 onListenToDuoAlarm = { id -> viewModel.listenToDuoAlarm(id) },
-                onSetDuoAlarmWinner = { id, uid -> viewModel.setDuoAlarmWinner(id, uid) }
+                onSetDuoAlarmWinner = { id, uid -> viewModel.setDuoAlarmWinner(id, uid) },
+                onRecordWin = { id, mode -> viewModel.recordAlarmWin(id, mode) },
+                onRecordLoss = { id, mode -> viewModel.recordAlarmLoss(id, mode) }
             )
         } else {
             AlarmPuzzleSolo(
                 onDismiss = {
+                    val activeId = AlarmState.activeAlarmId ?: ""
+                    viewModel.recordAlarmWin(activeId, "Solo")
                     AlarmState.isRinging = false
                     AlarmState.showStreakSave = true
                 },

@@ -69,7 +69,24 @@ class AndroidHomeRepository : HomeRepository {
                     val losses = snapshot.getLong("losses")?.toInt() ?: 0
                     val rank = snapshot.getString("rank") ?: "-"
                     
-                    trySend(HomeStats(streak, wins, losses, rank))
+                    val soloStreak = snapshot.getLong("soloAlarmStreak")?.toInt() ?: 0
+                    val soloWins = snapshot.getLong("soloAlarmWins")?.toInt() ?: 0
+                    val soloLosses = snapshot.getLong("soloAlarmLosses")?.toInt() ?: 0
+                    
+                    val duoStreak = snapshot.getLong("duoAlarmStreak")?.toInt() ?: 0
+                    val duoWins = snapshot.getLong("duoAlarmWins")?.toInt() ?: 0
+                    val duoLosses = snapshot.getLong("duoAlarmLosses")?.toInt() ?: 0
+                    
+                    val groupStreak = snapshot.getLong("groupAlarmStreak")?.toInt() ?: 0
+                    val groupWins = snapshot.getLong("groupAlarmWins")?.toInt() ?: 0
+                    val groupLosses = snapshot.getLong("groupAlarmLosses")?.toInt() ?: 0
+                    
+                    trySend(HomeStats(
+                        streak, wins, losses, rank,
+                        soloStreak, soloWins, soloLosses,
+                        duoStreak, duoWins, duoLosses,
+                        groupStreak, groupWins, groupLosses
+                    ))
                 }
             }
 
@@ -196,13 +213,64 @@ class AndroidHomeRepository : HomeRepository {
                 .document(habitId)
                 
             val snapshot = habitRef.get().await()
-            val currentStreak = snapshot.getLong("streak")?.toInt() ?: 0
-            val newStreak = if (isDone) currentStreak + 1 else maxOf(0, currentStreak - 1)
+            if (!snapshot.exists()) return Result.failure(Exception("Habit not found"))
             
-            habitRef.update(
-                "isDone", isDone,
-                "streak", newStreak
-            ).await()
+            val partnerUsername = snapshot.getString("partnerUsername") ?: ""
+            val currentStreak = snapshot.getLong("streak")?.toInt() ?: 0
+            
+            if (partnerUsername.isBlank()) {
+                // Solo Habit: standard increment/reset
+                val newStreak = if (isDone) currentStreak + 1 else maxOf(0, currentStreak - 1)
+                habitRef.update(
+                    "isDone", isDone,
+                    "streak", newStreak
+                ).await()
+            } else {
+                // Duo/Group Habit:
+                // 1. Update current user's isDone first
+                habitRef.update("isDone", isDone).await()
+                
+                // 2. Look up all participants (creator + partners)
+                val currentUserDoc = db.collection("users").document(user.uid).get().await()
+                val currentUsername = currentUserDoc.getString("username") ?: ""
+                val allUsernames = partnerUsername.split(",").map { it.trim() } + currentUsername
+                
+                val usersQuery = db.collection("users")
+                    .whereIn("username", allUsernames)
+                    .get()
+                    .await()
+                
+                val uids = usersQuery.documents.map { it.id }
+                
+                // 3. Fetch all participants' habit documents
+                val habitDocs = uids.map { uid ->
+                    db.collection("users").document(uid).collection("habits").document(habitId).get().await()
+                }
+                
+                val allCompleted = habitDocs.all { doc ->
+                    doc.exists() && (doc.getBoolean("isDone") ?: false)
+                }
+                
+                // 4. Update streaks for everyone
+                if (allCompleted) {
+                    // Everyone is done! Increment streak for everyone
+                    uids.forEach { uid ->
+                        val ref = db.collection("users").document(uid).collection("habits").document(habitId)
+                        val s = db.collection("users").document(uid).collection("habits").document(habitId).get().await().getLong("streak")?.toInt() ?: 0
+                        ref.update("streak", s + 1).await()
+                    }
+                } else if (!isDone) {
+                    // If we just unmarked it, we break/reset the shared streak for everyone
+                    uids.forEach { uid ->
+                        db.collection("users")
+                            .document(uid)
+                            .collection("habits")
+                            .document(habitId)
+                            .update("streak", 0)
+                            .await()
+                    }
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -551,6 +619,17 @@ class AndroidHomeRepository : HomeRepository {
     override suspend fun addHabit(habit: Habit): Result<Unit> {
         return try {
             val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            
+            val currentUserDoc = db.collection("users").document(user.uid).get().await()
+            val currentUsername = currentUserDoc.getString("username") ?: ""
+            
+            val partnerUsernames = habit.partnerUsername ?: ""
+            val allUsernames = if (partnerUsernames.isNotBlank()) {
+                partnerUsernames.split(",").map { it.trim() } + currentUsername
+            } else emptyList()
+            
+            val habitId = if (habit.id.isBlank()) "habit_${System.currentTimeMillis()}" else habit.id
+            
             val habitMap = hashMapOf(
                 "title" to habit.title,
                 "iconType" to habit.iconType.name,
@@ -558,13 +637,33 @@ class AndroidHomeRepository : HomeRepository {
                 "streak" to habit.streak,
                 "frequency" to habit.frequency,
                 "reminderTime" to habit.reminderTime,
-                "partnerUsername" to (habit.partnerUsername ?: "")
+                "partnerUsername" to partnerUsernames
             )
+            
             db.collection("users")
                 .document(user.uid)
                 .collection("habits")
-                .add(habitMap)
+                .document(habitId)
+                .set(habitMap)
                 .await()
+                
+            if (allUsernames.isNotEmpty()) {
+                val partnersQuery = db.collection("users")
+                    .whereIn("username", allUsernames)
+                    .get()
+                    .await()
+                
+                partnersQuery.documents.forEach { partnerDoc ->
+                    if (partnerDoc.id != user.uid) {
+                        db.collection("users")
+                            .document(partnerDoc.id)
+                            .collection("habits")
+                            .document(habitId)
+                            .set(habitMap)
+                            .await()
+                    }
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -574,12 +673,44 @@ class AndroidHomeRepository : HomeRepository {
     override suspend fun deleteHabit(habitId: String): Result<Unit> {
         return try {
             val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            
+            val habitDoc = db.collection("users")
+                .document(user.uid)
+                .collection("habits")
+                .document(habitId)
+                .get()
+                .await()
+                
+            val partnerUsername = habitDoc.getString("partnerUsername") ?: ""
+            
             db.collection("users")
                 .document(user.uid)
                 .collection("habits")
                 .document(habitId)
                 .delete()
                 .await()
+                
+            if (partnerUsername.isNotBlank()) {
+                val currentUserDoc = db.collection("users").document(user.uid).get().await()
+                val currentUsername = currentUserDoc.getString("username") ?: ""
+                val allUsernames = partnerUsername.split(",").map { it.trim() } + currentUsername
+                
+                val partnersQuery = db.collection("users")
+                    .whereIn("username", allUsernames)
+                    .get()
+                    .await()
+                    
+                partnersQuery.documents.forEach { partnerDoc ->
+                    if (partnerDoc.id != user.uid) {
+                        db.collection("users")
+                            .document(partnerDoc.id)
+                            .collection("habits")
+                            .document(habitId)
+                            .delete()
+                            .await()
+                    }
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -589,6 +720,13 @@ class AndroidHomeRepository : HomeRepository {
     override suspend fun updateHabit(habit: Habit): Result<Unit> {
         return try {
             val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            val partnerUsernames = habit.partnerUsername ?: ""
+            val currentUserDoc = db.collection("users").document(user.uid).get().await()
+            val currentUsername = currentUserDoc.getString("username") ?: ""
+            val allUsernames = if (partnerUsernames.isNotBlank()) {
+                partnerUsernames.split(",").map { it.trim() } + currentUsername
+            } else emptyList()
+
             val habitMap = hashMapOf(
                 "title" to habit.title,
                 "iconType" to habit.iconType.name,
@@ -596,14 +734,106 @@ class AndroidHomeRepository : HomeRepository {
                 "streak" to habit.streak,
                 "frequency" to habit.frequency,
                 "reminderTime" to habit.reminderTime,
-                "partnerUsername" to (habit.partnerUsername ?: "")
+                "partnerUsername" to partnerUsernames
             )
+
             db.collection("users")
                 .document(user.uid)
                 .collection("habits")
                 .document(habit.id)
                 .set(habitMap)
                 .await()
+
+            if (allUsernames.isNotEmpty()) {
+                val partnersQuery = db.collection("users")
+                    .whereIn("username", allUsernames)
+                    .get()
+                    .await()
+
+                partnersQuery.documents.forEach { partnerDoc ->
+                    if (partnerDoc.id != user.uid) {
+                        db.collection("users")
+                            .document(partnerDoc.id)
+                            .collection("habits")
+                            .document(habit.id)
+                            .set(habitMap)
+                            .await()
+                    }
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun recordAlarmResult(alarmId: String, mode: String, isWin: Boolean): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            val userDoc = db.collection("users").document(user.uid)
+            
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(userDoc)
+                
+                val wins = snapshot.getLong("wins")?.toInt() ?: 0
+                val losses = snapshot.getLong("losses")?.toInt() ?: 0
+                
+                val soloStreak = snapshot.getLong("soloAlarmStreak")?.toInt() ?: 0
+                val soloWins = snapshot.getLong("soloAlarmWins")?.toInt() ?: 0
+                val soloLosses = snapshot.getLong("soloAlarmLosses")?.toInt() ?: 0
+                
+                val duoStreak = snapshot.getLong("duoAlarmStreak")?.toInt() ?: 0
+                val duoWins = snapshot.getLong("duoAlarmWins")?.toInt() ?: 0
+                val duoLosses = snapshot.getLong("duoAlarmLosses")?.toInt() ?: 0
+                
+                val groupStreak = snapshot.getLong("groupAlarmStreak")?.toInt() ?: 0
+                val groupWins = snapshot.getLong("groupAlarmWins")?.toInt() ?: 0
+                val groupLosses = snapshot.getLong("groupAlarmLosses")?.toInt() ?: 0
+                
+                val updates = hashMapOf<String, Any>()
+                
+                if (isWin) {
+                    updates["wins"] = wins + 1
+                    when (mode) {
+                        "Solo" -> {
+                            val newStreak = soloStreak + 1
+                            updates["soloAlarmStreak"] = newStreak
+                            updates["soloAlarmWins"] = soloWins + 1
+                            updates["streak"] = newStreak
+                        }
+                        "Duo" -> {
+                            val newStreak = duoStreak + 1
+                            updates["duoAlarmStreak"] = newStreak
+                            updates["duoAlarmWins"] = duoWins + 1
+                            updates["streak"] = newStreak
+                        }
+                        else -> {
+                            val newStreak = groupStreak + 1
+                            updates["groupAlarmStreak"] = newStreak
+                            updates["groupAlarmWins"] = groupWins + 1
+                            updates["streak"] = newStreak
+                        }
+                    }
+                } else {
+                    updates["losses"] = losses + 1
+                    when (mode) {
+                        "Solo" -> {
+                            updates["soloAlarmStreak"] = 0
+                            updates["soloAlarmLosses"] = soloLosses + 1
+                        }
+                        "Duo" -> {
+                            updates["duoAlarmStreak"] = 0
+                            updates["duoAlarmLosses"] = duoLosses + 1
+                        }
+                        else -> {
+                            updates["groupAlarmStreak"] = 0
+                            updates["groupAlarmLosses"] = groupLosses + 1
+                        }
+                    }
+                }
+                
+                transaction.update(userDoc, updates)
+            }.await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

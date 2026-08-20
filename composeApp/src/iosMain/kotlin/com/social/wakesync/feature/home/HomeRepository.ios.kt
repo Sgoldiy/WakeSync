@@ -15,7 +15,7 @@ class IosHomeRepository : HomeRepository {
             Habit("5", "Stretch", HabitIconType.STRETCH, false)
         )
     )
-    private val _stats = MutableStateFlow(HomeStats(23, 18, 5, "#4"))
+    private val _stats = MutableStateFlow(HomeStats(23, 18, 5, "#4", soloStreak = 12, soloWins = 10, soloLosses = 2, duoStreak = 6, duoWins = 5, duoLosses = 1, groupStreak = 5, groupWins = 3, groupLosses = 2))
     private val _friends = MutableStateFlow(
         listOf(
             Friend("1", "maya.rises", "🦁", 41, FriendStatus.ACTIVE),
@@ -111,6 +111,53 @@ class IosHomeRepository : HomeRepository {
         _habits.value = _habits.value.map {
             if (it.id == habit.id) habit else it
         }
+        return Result.success(Unit)
+    }
+
+    override suspend fun recordAlarmResult(alarmId: String, mode: String, isWin: Boolean): Result<Unit> {
+        val current = _stats.value
+        val updated = when (mode) {
+            "Solo" -> {
+                val newStreak = if (isWin) current.soloStreak + 1 else 0
+                val newWins = if (isWin) current.soloWins + 1 else current.soloWins
+                val newLosses = if (!isWin) current.soloLosses + 1 else current.soloLosses
+                current.copy(
+                    soloStreak = newStreak,
+                    soloWins = newWins,
+                    soloLosses = newLosses,
+                    streak = newStreak,
+                    wins = current.wins + (if (isWin) 1 else 0),
+                    losses = current.losses + (if (!isWin) 1 else 0)
+                )
+            }
+            "Duo" -> {
+                val newStreak = if (isWin) current.duoStreak + 1 else 0
+                val newWins = if (isWin) current.duoWins + 1 else current.duoWins
+                val newLosses = if (!isWin) current.duoLosses + 1 else current.duoLosses
+                current.copy(
+                    duoStreak = newStreak,
+                    duoWins = newWins,
+                    duoLosses = newLosses,
+                    streak = newStreak,
+                    wins = current.wins + (if (isWin) 1 else 0),
+                    losses = current.losses + (if (!isWin) 1 else 0)
+                )
+            }
+            else -> { // Group
+                val newStreak = if (isWin) current.groupStreak + 1 else 0
+                val newWins = if (isWin) current.groupWins + 1 else current.groupWins
+                val newLosses = if (!isWin) current.groupLosses + 1 else current.groupLosses
+                current.copy(
+                    groupStreak = newStreak,
+                    groupWins = newWins,
+                    groupLosses = newLosses,
+                    streak = newStreak,
+                    wins = current.wins + (if (isWin) 1 else 0),
+                    losses = current.losses + (if (!isWin) 1 else 0)
+                )
+            }
+        }
+        _stats.value = updated
         return Result.success(Unit)
     }
 }

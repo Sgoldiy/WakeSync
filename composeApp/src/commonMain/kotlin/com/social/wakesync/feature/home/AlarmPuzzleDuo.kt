@@ -78,7 +78,9 @@ fun AlarmPuzzleDuo(
     alarmId: String? = null,
     currentUserId: String? = null,
     onListenToDuoAlarm: ((String) -> kotlinx.coroutines.flow.Flow<String?>)? = null,
-    onSetDuoAlarmWinner: ((String, String) -> Unit)? = null
+    onSetDuoAlarmWinner: ((String, String) -> Unit)? = null,
+    onRecordWin: ((String, String) -> Unit)? = null,
+    onRecordLoss: ((String, String) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     var isUserDone by remember { mutableStateOf(false) }
@@ -124,12 +126,14 @@ fun AlarmPuzzleDuo(
                         isUserDone = true
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         delay(800)
+                        onRecordWin?.invoke(alarmId, AlarmState.activeAlarmMode)
                         AlarmState.isRinging = false
                         AlarmState.showStreakSave = true
                     } else {
                         isRivalDone = true
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         delay(800)
+                        onRecordLoss?.invoke(alarmId, AlarmState.activeAlarmMode)
                         AlarmState.isRinging = false
                         AlarmState.showStreakBroken = true
                     }
@@ -147,6 +151,9 @@ fun AlarmPuzzleDuo(
                 isRivalDone = true
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 delay(1000)
+                if (alarmId != null) {
+                    onRecordLoss?.invoke(alarmId, AlarmState.activeAlarmMode)
+                }
                 AlarmState.isRinging = false
                 AlarmState.showStreakBroken = true
             }
@@ -158,10 +165,14 @@ fun AlarmPuzzleDuo(
         if (!isRivalDone && !isUserDone) {
             if (alarmId != null && onSetDuoAlarmWinner != null && currentUserId != null) {
                 onSetDuoAlarmWinner(alarmId, currentUserId)
+                onRecordWin?.invoke(alarmId, AlarmState.activeAlarmMode)
             } else {
                 // Local Fallback
                 isUserDone = true
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                if (alarmId != null) {
+                    onRecordWin?.invoke(alarmId, AlarmState.activeAlarmMode)
+                }
                 AlarmState.isRinging = false
                 AlarmState.showStreakSave = true
             }
