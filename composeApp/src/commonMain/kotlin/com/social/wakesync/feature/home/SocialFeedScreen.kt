@@ -32,6 +32,7 @@ fun SocialFeedScreen(
     titleFamily: FontFamily,
     interFamily: FontFamily,
     onStoryClick: (StoryItem) -> Unit,
+    onUserClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Stories mock data matching screenshot
@@ -216,7 +217,8 @@ fun SocialFeedScreen(
                                     )
                                 } else fit
                             }
-                        }
+                        },
+                        onUserClick = onUserClick
                     )
                     Spacer(modifier = Modifier.height(12.dp)) // Same spacing as the screenshot
                 }
@@ -382,7 +384,8 @@ fun ActivityCard(
     titleFamily: FontFamily,
     interFamily: FontFamily,
     onReplyClick: () -> Unit,
-    onReactionClick: (String) -> Unit
+    onReactionClick: (String) -> Unit,
+    onUserClick: (String) -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -413,7 +416,8 @@ fun ActivityCard(
                             .border(1.2.dp, item.avatarBorderColor, CircleShape)
                             .padding(1.5.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.03f)),
+                            .background(Color.White.copy(alpha = 0.03f))
+                            .clickable { onUserClick(item.username) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(text = item.avatar, fontSize = 18.sp)
@@ -425,7 +429,8 @@ fun ActivityCard(
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = interFamily
+                            fontFamily = interFamily,
+                            modifier = Modifier.clickable { onUserClick(item.username) }
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(

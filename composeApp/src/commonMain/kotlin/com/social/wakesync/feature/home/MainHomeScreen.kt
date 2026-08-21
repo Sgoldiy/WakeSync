@@ -96,6 +96,7 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
     var activeHabit by remember { mutableStateOf<Habit?>(null) }
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
     var activeStory by remember { mutableStateOf<StoryItem?>(null) }
+    var selectedUserForProfile by remember { mutableStateOf<String?>(null) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Emoji Picker State
@@ -218,6 +219,17 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             titleFamily = titleFamily,
             interFamily = interFamily
         )
+    } else if (selectedUserForProfile != null) {
+        UserProfileScreen(
+            username = selectedUserForProfile!!,
+            onBack = { selectedUserForProfile = null },
+            onChallengeClick = {
+                showSetAlarmScreen = true
+                selectedUserForProfile = null
+            },
+            titleFamily = titleFamily,
+            interFamily = interFamily
+        )
     } else if (activeStory != null) {
         StoryViewScreen(
             story = activeStory!!,
@@ -275,7 +287,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                         SocialFeedScreen(
                             titleFamily = titleFamily,
                             interFamily = interFamily,
-                            onStoryClick = { story -> activeStory = story }
+                            onStoryClick = { story -> activeStory = story },
+                            onUserClick = { username -> selectedUserForProfile = username }
                         )
                     }
 
