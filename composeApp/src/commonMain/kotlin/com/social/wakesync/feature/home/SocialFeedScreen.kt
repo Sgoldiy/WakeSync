@@ -33,7 +33,7 @@ fun SocialFeedScreen(
     interFamily: FontFamily,
     modifier: Modifier = Modifier
 ) {
-    // Stories mock data
+    // Stories mock data matching screenshot
     val stories = remember {
         listOf(
             StoryItem("1", "Your story", "+", Color.White.copy(alpha = 0.15f), isUser = true),
@@ -44,7 +44,7 @@ fun SocialFeedScreen(
         )
     }
 
-    // Interactive feed items
+    // Interactive feed items matching screenshot exactly
     var feedItems by remember {
         mutableStateOf(
             listOf(
@@ -55,10 +55,10 @@ fun SocialFeedScreen(
                     timeAgo = "2m ago",
                     streak = 41,
                     badgeText = "win",
-                    badgeColor = Color(0xFF00FF94),
+                    badgeColor = Color(0xFF22C55E),
                     content = "Finished 1st 🏆 Group alarm crushed.",
                     reactions = listOf("🔥" to 14, "⚡" to 8),
-                    avatarBorderColor = Color(0xFF00FF94)
+                    avatarBorderColor = Color(0xFF22C55E)
                 ),
                 FeedItem(
                     id = "2",
@@ -112,34 +112,32 @@ fun SocialFeedScreen(
             .background(AppColorPalette.VoidBg)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Header Row (Activity, Search, Notifications)
+            // Header Row (Matches HomeHeader height and alignment)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = "Activity",
                     color = Color.White,
-                    fontSize = 30.sp,
+                    fontSize = 24.sp, // Match same top header prominence size in home screen (20-24sp)
                     fontWeight = FontWeight.Bold,
                     fontFamily = titleFamily
                 )
                 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Search Button
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.04f))
                             .clickable { searchActive = true },
@@ -149,14 +147,14 @@ fun SocialFeedScreen(
                             imageVector = Icons.Rounded.Search,
                             contentDescription = "Search",
                             tint = AppColorPalette.CyanCta,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
                     // Notification Button
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.04f))
                             .clickable { notificationsActive = true },
@@ -166,7 +164,7 @@ fun SocialFeedScreen(
                             imageVector = Icons.Rounded.Notifications,
                             contentDescription = "Notifications",
                             tint = Color(0xFFFFD23D),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -181,9 +179,9 @@ fun SocialFeedScreen(
                     LazyRow(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 24.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            .padding(bottom = 14.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(stories) { story ->
                             StoryCircle(
@@ -191,7 +189,7 @@ fun SocialFeedScreen(
                                 interFamily = interFamily,
                                 onClick = {
                                     if (story.isUser) {
-                                        // User story upload mockup
+                                        // User story upload mock
                                     } else {
                                         selectedStoryForPreview = story
                                     }
@@ -201,7 +199,7 @@ fun SocialFeedScreen(
                     }
                 }
 
-                // Activity Feed Cards
+                // Activity Feed Cards (Matches exact space between two cards and edges)
                 items(feedItems, key = { it.id }) { item ->
                     ActivityCard(
                         item = item,
@@ -220,7 +218,7 @@ fun SocialFeedScreen(
                             }
                         }
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp)) // Same spacing as the screenshot
                 }
             }
         }
@@ -324,8 +322,8 @@ fun StoryCircle(
     ) {
         Box(
             modifier = Modifier
-                .size(72.dp)
-                .padding(3.dp),
+                .size(62.dp) // Updated size to match screenshot proportions
+                .padding(2.dp),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -333,16 +331,16 @@ fun StoryCircle(
                     drawCircle(
                         color = story.borderColor,
                         style = Stroke(
-                            width = 2.dp.toPx(),
+                            width = 1.5.dp.toPx(),
                             pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                                floatArrayOf(10f, 10f), 0f
+                                floatArrayOf(8f, 8f), 0f
                             )
                         )
                     )
                 } else {
                     drawCircle(
                         color = story.borderColor,
-                        style = Stroke(width = 2.dp.toPx())
+                        style = Stroke(width = 1.5.dp.toPx())
                     )
                 }
             }
@@ -350,40 +348,38 @@ fun StoryCircle(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(5.dp)
+                    .padding(4.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.05f)),
+                    .background(Color.White.copy(alpha = 0.03f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (story.isUser) {
                     Text(
                         text = story.avatar,
                         color = AppColorPalette.CyanCta,
-                        fontSize = 24.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = interFamily
                     )
                 } else {
                     Text(
                         text = story.avatar,
-                        fontSize = 28.sp
+                        fontSize = 24.sp
                     )
                 }
             }
         }
         
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         
-        val displayText = if (story.username.length > 9) {
-            story.username.take(9) + "..."
-        } else {
-            story.username
-        }
         Text(
-            text = displayText,
-            color = Color.White.copy(alpha = if (story.isUser) 0.5f else 0.8f),
-            fontSize = 11.sp,
-            fontFamily = interFamily
+            text = story.username,
+            color = Color.White.copy(alpha = if (story.isUser) 0.4f else 0.7f),
+            fontSize = 10.sp,
+            fontFamily = interFamily,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(62.dp)
         )
     }
 }
@@ -399,16 +395,17 @@ fun ActivityCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 10.dp), // Set same edge margin as home screen cards
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = AppColorPalette.Surface),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF111420)), // Same dark tint as mockup cards
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.03f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp)
+                .padding(14.dp) // Perfect interior spacing matching screenshot
         ) {
+            // Profile & Badge Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -416,40 +413,40 @@ fun ActivityCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(46.dp)
-                            .border(1.5.dp, item.avatarBorderColor, CircleShape)
-                            .padding(2.dp)
+                            .size(40.dp)
+                            .border(1.2.dp, item.avatarBorderColor, CircleShape)
+                            .padding(1.5.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.04f)),
+                            .background(Color.White.copy(alpha = 0.03f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = item.avatar, fontSize = 20.sp)
+                        Text(text = item.avatar, fontSize = 18.sp)
                     }
                     
                     Column {
                         Text(
                             text = item.username,
                             color = Color.White,
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = interFamily
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = item.timeAgo,
-                                color = Color.White.copy(alpha = 0.4f),
-                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.35f),
+                                fontSize = 11.sp,
                                 fontFamily = interFamily
                             )
                             if (item.streak > 0) {
                                 Text(
-                                    text = " • 🔥 ${item.streak}",
+                                    text = " · 🔥 ${item.streak}",
                                     color = Color(0xFFFF8A3D),
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = interFamily
                                 )
@@ -458,42 +455,45 @@ fun ActivityCard(
                     }
                 }
 
+                // Status Badge pill matching screenshot colors
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(item.badgeColor.copy(alpha = 0.1f))
-                        .border(1.dp, item.badgeColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .background(item.badgeColor.copy(alpha = 0.08f))
+                        .border(1.dp, item.badgeColor.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
                 ) {
                     Text(
                         text = item.badgeText,
                         color = item.badgeColor,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = interFamily
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
+            // Feed Content Text
             Text(
                 text = item.content,
                 color = Color.White,
-                fontSize = 15.sp,
-                lineHeight = 20.sp,
+                fontSize = 14.sp,
+                lineHeight = 18.sp,
                 fontFamily = interFamily
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
+            // Footer Reactions & Reply alignment
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     item.reactions.forEach { (emoji, count) ->
@@ -507,8 +507,8 @@ fun ActivityCard(
 
                 Text(
                     text = "Reply",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = interFamily,
                     modifier = Modifier
@@ -517,7 +517,7 @@ fun ActivityCard(
                             indication = null,
                             onClick = onReplyClick
                         )
-                        .padding(vertical = 4.dp, horizontal = 8.dp)
+                        .padding(vertical = 4.dp, horizontal = 6.dp)
                 )
             }
         }
