@@ -263,6 +263,13 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                         }
                     }
 
+                    HomeTab.SOCIAL -> {
+                        SocialFeedScreen(
+                            titleFamily = titleFamily,
+                            interFamily = interFamily
+                        )
+                    }
+
                     else -> PlaceholderContent(selectedTab.title)
                 }
 

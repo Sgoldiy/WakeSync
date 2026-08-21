@@ -125,7 +125,6 @@ fun AddHabitScreen(
                         fontFamily = interFamily,
                         letterSpacing = 1.sp
                     )
-
                     // Border colored cyan when text is present
                     val activeBorderColor = if (title.isNotBlank()) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.08f)
                     Row(
@@ -186,7 +185,6 @@ fun AddHabitScreen(
                         )
                     }
                 }
-
                 // Section 2: Frequency
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -197,7 +195,6 @@ fun AddHabitScreen(
                         fontFamily = interFamily,
                         letterSpacing = 1.sp
                     )
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -226,7 +223,6 @@ fun AddHabitScreen(
                         }
                     }
                 }
-
                 // Section 3: Reminder Time
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -237,7 +233,6 @@ fun AddHabitScreen(
                         fontFamily = interFamily,
                         letterSpacing = 1.sp
                     )
-
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -299,7 +294,6 @@ fun AddHabitScreen(
                                 fontFamily = interFamily
                             )
                         }
-
                         Switch(
                             checked = isAccountabilityEnabled,
                             onCheckedChange = { isAccountabilityEnabled = it },
