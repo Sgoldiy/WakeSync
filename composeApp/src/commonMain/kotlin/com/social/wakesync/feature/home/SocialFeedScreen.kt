@@ -31,6 +31,7 @@ import com.social.wakesync.ui.theme.AppColorPalette
 fun SocialFeedScreen(
     titleFamily: FontFamily,
     interFamily: FontFamily,
+    onStoryClick: (StoryItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Stories mock data matching screenshot
@@ -100,7 +101,6 @@ fun SocialFeedScreen(
         )
     }
 
-    var selectedStoryForPreview by remember { mutableStateOf<StoryItem?>(null) }
     var replyingToItem by remember { mutableStateOf<FeedItem?>(null) }
     var replyText by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
@@ -191,7 +191,7 @@ fun SocialFeedScreen(
                                     if (story.isUser) {
                                         // User story upload mock
                                     } else {
-                                        selectedStoryForPreview = story
+                                        onStoryClick(story)
                                     }
                                 }
                             )
@@ -223,15 +223,7 @@ fun SocialFeedScreen(
             }
         }
 
-        // Story Preview Modal
-        selectedStoryForPreview?.let { story ->
-            StoryPreviewOverlay(
-                story = story,
-                onDismiss = { selectedStoryForPreview = null },
-                titleFamily = titleFamily,
-                interFamily = interFamily
-            )
-        }
+
 
         // Search Overlay Mock
         if (searchActive) {
@@ -561,83 +553,7 @@ fun ReactionPill(
     }
 }
 
-@Composable
-fun StoryPreviewOverlay(
-    story: StoryItem,
-    onDismiss: () -> Unit,
-    titleFamily: FontFamily,
-    interFamily: FontFamily
-) {
-    var progress by remember { mutableStateOf(0f) }
-    LaunchedEffect(Unit) {
-        animate(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = tween(4000, easing = LinearEasing)
-        ) { value, _ ->
-            progress = value
-        }
-        onDismiss()
-    }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.95f))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onDismiss
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.padding(horizontal = 32.dp)
-        ) {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .clip(CircleShape),
-                color = story.borderColor,
-                trackColor = Color.White.copy(alpha = 0.1f)
-            )
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(text = story.avatar, fontSize = 64.sp)
-                Column {
-                    Text(
-                        text = story.username,
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = titleFamily
-                    )
-                    Text(
-                        text = "Active Streak: 🔥 41 days",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 14.sp,
-                        fontFamily = interFamily
-                    )
-                }
-            }
-
-            Text(
-                text = "🌅 Wake Syncing since 6:00 AM! Let's crush today's target goals together.",
-                color = Color.White,
-                fontSize = 18.sp,
-                lineHeight = 26.sp,
-                fontFamily = interFamily
-            )
-        }
-    }
-}
 
 @Composable
 fun SearchOverlay(
