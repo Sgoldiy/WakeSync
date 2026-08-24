@@ -111,7 +111,13 @@ class AlarmService : Service() {
             }
         }
 
-        acquireWakeLock()
+        val timeoutMs = if (alarmMode.equals("Solo", ignoreCase = true)) {
+            2 * 60 * 1000L // 2 minutes
+        } else {
+            AUTO_STOP_MS
+        }
+
+        acquireWakeLock(timeoutMs)
         createNotificationChannel()
 
         val notification = buildNotification(alarmId, alarmTime, alarmLabel, alarmMode, soundId)
@@ -120,13 +126,13 @@ class AlarmService : Service() {
         startRinging(soundId)
         startVibrating()
 
-        handler.postDelayed(autoStopRunnable, AUTO_STOP_MS)
+        handler.postDelayed(autoStopRunnable, timeoutMs)
 
         return START_STICKY
     }
 
     @SuppressLint("Wakelock")
-    private fun acquireWakeLock() {
+    private fun acquireWakeLock(timeoutMs: Long) {
         // Enforce 100% Alarm Stream Volume so user cannot sneakily silence alarm
         try {
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
@@ -141,7 +147,7 @@ class AlarmService : Service() {
             PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
             "WakeSync::AlarmWakeLock"
         ).apply {
-            acquire(AUTO_STOP_MS)
+            acquire(timeoutMs)
         }
     }
 

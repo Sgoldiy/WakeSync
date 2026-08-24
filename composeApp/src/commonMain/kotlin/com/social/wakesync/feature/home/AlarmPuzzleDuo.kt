@@ -68,6 +68,7 @@ enum class DuoPuzzleType(val displayName: String, val emoji: String) {
 @Composable
 fun AlarmPuzzleDuo(
     onDismiss: () -> Unit,
+    onFailure: () -> Unit = {},
     titleFamily: FontFamily,
     interFamily: FontFamily,
     modifier: Modifier = Modifier,
@@ -112,8 +113,7 @@ fun AlarmPuzzleDuo(
         if (timeLeft == 0 && !isUserDone && !isRivalDone) {
             // Time out! Alarm stops, both lose 3 streaks
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            AlarmState.isRinging = false
-            AlarmState.showStreakBroken = true
+            onFailure()
         }
     }
 
@@ -127,15 +127,13 @@ fun AlarmPuzzleDuo(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         delay(800)
                         onRecordWin?.invoke(alarmId, AlarmState.activeAlarmMode)
-                        AlarmState.isRinging = false
-                        AlarmState.showStreakSave = true
+                        onDismiss()
                     } else {
                         isRivalDone = true
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         delay(800)
                         onRecordLoss?.invoke(alarmId, AlarmState.activeAlarmMode)
-                        AlarmState.isRinging = false
-                        AlarmState.showStreakBroken = true
+                        onFailure()
                     }
                 }
             }
@@ -154,8 +152,7 @@ fun AlarmPuzzleDuo(
                 if (alarmId != null) {
                     onRecordLoss?.invoke(alarmId, AlarmState.activeAlarmMode)
                 }
-                AlarmState.isRinging = false
-                AlarmState.showStreakBroken = true
+                onFailure()
             }
         }
     }
@@ -173,8 +170,7 @@ fun AlarmPuzzleDuo(
                 if (alarmId != null) {
                     onRecordWin?.invoke(alarmId, AlarmState.activeAlarmMode)
                 }
-                AlarmState.isRinging = false
-                AlarmState.showStreakSave = true
+                onDismiss()
             }
         }
     }

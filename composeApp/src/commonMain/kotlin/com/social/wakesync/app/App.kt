@@ -69,10 +69,15 @@ fun App(
                 onDismissAlarm()
                 AlarmState.showStreakSave = true
             }
+            val onAlarmFailed = {
+                onDismissAlarm()
+                AlarmState.showStreakBroken = true
+            }
             when (AlarmState.activeAlarmMode) {
                 "Duo" -> {
                     AlarmPuzzleDuo(
                         onDismiss = onAlarmSolved,
+                        onFailure = onAlarmFailed,
                         titleFamily = titleFamily,
                         interFamily = interFamily
                     )
@@ -87,6 +92,7 @@ fun App(
                 else -> {
                     AlarmPuzzleSolo(
                         onDismiss = onAlarmSolved,
+                        onFailure = onAlarmFailed,
                         titleFamily = titleFamily,
                         interFamily = interFamily
                     )

@@ -80,6 +80,7 @@ enum class SoloPuzzleType(val displayName: String, val emoji: String) {
 @Composable
 fun AlarmPuzzleSolo(
     onDismiss: () -> Unit,
+    onFailure: () -> Unit = {},
     titleFamily: FontFamily,
     interFamily: FontFamily,
     challengeName: String = "Math",
@@ -143,8 +144,7 @@ fun AlarmPuzzleSolo(
         } else {
             // Attempt 2 Failed -> User fails alarm, loses 3 streaks & triggers Broken Streak screen!
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            AlarmState.isRinging = false
-            AlarmState.showStreakBroken = true
+            onFailure()
         }
     }
 
@@ -152,8 +152,7 @@ fun AlarmPuzzleSolo(
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         if (currentStage >= totalStages) {
             // Success! Gain 1 streak & dismiss alarm
-            AlarmState.isRinging = false
-            AlarmState.showStreakSave = true
+            onDismiss()
         } else {
             currentStage++
         }
