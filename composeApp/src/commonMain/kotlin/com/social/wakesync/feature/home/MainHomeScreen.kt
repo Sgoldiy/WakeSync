@@ -98,6 +98,7 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
     var activeStory by remember { mutableStateOf<StoryItem?>(null) }
     var selectedUserForProfile by remember { mutableStateOf<String?>(null) }
     var activeChatId by remember { mutableStateOf<String?>(null) }
+    var activeFindRivalsId by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Emoji Picker State
@@ -243,6 +244,16 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             titleFamily = titleFamily,
             interFamily = interFamily
         )
+    } else if (activeFindRivalsId) {
+        FindRivalsScreen(
+            onBack = { activeFindRivalsId = false },
+            onRivalSelected = { rivalUsername ->
+                showSetAlarmScreen = true
+                activeFindRivalsId = false
+            },
+            titleFamily = titleFamily,
+            interFamily = interFamily
+        )
     } else if (activeChatId != null) {
         ChatDetailScreen(
             chatId = activeChatId!!,
@@ -310,7 +321,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                             titleFamily = titleFamily,
                             interFamily = interFamily,
                             currentUsername = uiState.userName.ifEmpty { "nocturnaljake" },
-                            currentUserAvatar = uiState.avatarEmoji.ifEmpty { "🥱" }
+                            currentUserAvatar = uiState.avatarEmoji.ifEmpty { "🥱" },
+                            onFindRivalsClick = { activeFindRivalsId = true }
                         )
                     }
 

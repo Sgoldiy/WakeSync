@@ -32,6 +32,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.social.wakesync.ui.theme.AppColorPalette
 
+data class MessageItem(
+    val id: String,
+    val sender: String,
+    val avatar: String,
+    val message: String,
+    val timestamp: String,
+    val isIncoming: Boolean,
+    val hasProofPhoto: Boolean = false
+)
+
 @Composable
 fun ChatDetailScreen(
     chatId: String,
@@ -133,7 +143,7 @@ fun ChatDetailScreen(
             }
         }
 
-        Divider(color = Color.White.copy(alpha = 0.05f), thickness = 1.dp)
+        HorizontalDivider(color = Color.White.copy(alpha = 0.05f), thickness = 1.dp)
 
         // Pinned Punishment Banner
         Row(
@@ -168,7 +178,7 @@ fun ChatDetailScreen(
             )
         }
 
-        Divider(color = Color.White.copy(alpha = 0.05f), thickness = 1.dp)
+        HorizontalDivider(color = Color.White.copy(alpha = 0.05f), thickness = 1.dp)
 
         // Chat conversation area
         Box(
