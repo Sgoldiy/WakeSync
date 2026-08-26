@@ -30,6 +30,8 @@ import com.social.wakesync.feature.home.AlarmPuzzleDuo
 import com.social.wakesync.feature.home.AlarmPuzzleGroup
 import com.social.wakesync.feature.home.StreakSaveScreen
 import com.social.wakesync.feature.home.StreakBrokenScreen
+import com.social.wakesync.feature.home.HomeViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.Font
@@ -64,12 +66,19 @@ fun App(
     )
 
     MaterialTheme {
+        val homeViewModel: HomeViewModel = viewModel { HomeViewModel() }
+        val homeUiState by homeViewModel.uiState.collectAsState()
+
         if (AlarmState.isRinging) {
             val onAlarmSolved = {
+                val activeId = AlarmState.activeAlarmId ?: ""
+                homeViewModel.recordAlarmWin(activeId, AlarmState.activeAlarmMode)
                 onDismissAlarm()
                 AlarmState.showStreakSave = true
             }
             val onAlarmFailed = {
+                val activeId = AlarmState.activeAlarmId ?: ""
+                homeViewModel.recordAlarmLoss(activeId, AlarmState.activeAlarmMode)
                 onDismissAlarm()
                 AlarmState.showStreakBroken = true
             }
@@ -79,7 +88,13 @@ fun App(
                         onDismiss = onAlarmSolved,
                         onFailure = onAlarmFailed,
                         titleFamily = titleFamily,
-                        interFamily = interFamily
+                        interFamily = interFamily,
+                        userName = homeUiState.userName.ifEmpty { "You" },
+                        userAvatar = homeUiState.avatarEmoji.ifEmpty { "🤯" },
+                        alarmId = AlarmState.activeAlarmId,
+                        currentUserId = homeViewModel.getCurrentUserUid(),
+                        onListenToDuoAlarm = { id -> homeViewModel.listenToDuoAlarm(id) },
+                        onSetDuoAlarmWinner = { id, uid -> homeViewModel.setDuoAlarmWinner(id, uid) }
                     )
                 }
                 "Group" -> {
@@ -100,11 +115,11 @@ fun App(
             }
         } else if (AlarmState.showStreakSave) {
             StreakSaveScreen(
-                streakDays = 24,
+                streakDays = homeUiState.streak,
                 finishPosition = 1,
-                totalParticipants = 5,
-                sleepingFriends = listOf("🦁", "🐻", "🐱"),
-                friendsLostCount = 3,
+                totalParticipants = if (AlarmState.activeAlarmMode == "Solo") 1 else 2,
+                sleepingFriends = if (AlarmState.activeAlarmMode == "Solo") emptyList() else listOf("🦁"),
+                friendsLostCount = 0,
                 onShareClick = { /* TODO: share logic */ },
                 onBackToHome = { AlarmState.showStreakSave = false },
                 titleFamily = titleFamily,
@@ -112,8 +127,8 @@ fun App(
             )
         } else if (AlarmState.showStreakBroken) {
             StreakBrokenScreen(
-                previousStreak = 23,
-                currentStreak = 0,
+                previousStreak = homeUiState.streak + 3,
+                currentStreak = homeUiState.streak,
                 punishmentText = "20 pushups 💪",
                 punishmentDetail = "Photo proof required · Due 8:30 AM",
                 onCompletePunishment = { AlarmState.showStreakBroken = false },

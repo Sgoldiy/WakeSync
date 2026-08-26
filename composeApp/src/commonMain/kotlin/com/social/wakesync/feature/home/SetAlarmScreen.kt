@@ -96,11 +96,24 @@ fun SetAlarmScreen(
 
     // Duo / Group User Search Bottom Sheet State
     var showAddParticipantsSheet by remember { mutableStateOf(false) }
+    var showFindRivalsScreen by remember { mutableStateOf(false) }
     val selectedParticipants = remember { mutableStateListOf<String>() }
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
 
-    Scaffold(
-        containerColor = AppColorPalette.VoidBg,
+    if (showFindRivalsScreen) {
+        FindRivalsScreen(
+            onBack = { showFindRivalsScreen = false },
+            onRivalSelected = { username ->
+                selectedParticipants.clear()
+                selectedParticipants.add(username)
+                showFindRivalsScreen = false
+            },
+            titleFamily = titleFamily,
+            interFamily = interFamily
+        )
+    } else {
+        Scaffold(
+            containerColor = AppColorPalette.VoidBg,
         topBar = {
             Box(
                 modifier = Modifier
@@ -270,7 +283,9 @@ fun SetAlarmScreen(
                             isSelected = selectedMode == mode,
                             onClick = {
                                 selectedMode = mode
-                                if (mode == "Duo" || mode == "Group") {
+                                if (mode == "Duo") {
+                                    showFindRivalsScreen = true
+                                } else if (mode == "Group") {
                                     showAddParticipantsSheet = true
                                 }
                             },
@@ -288,7 +303,13 @@ fun SetAlarmScreen(
                             .clip(RoundedCornerShape(12.dp))
                             .background(AppColorPalette.Surface)
                             .border(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                            .clickable { showAddParticipantsSheet = true }
+                            .clickable {
+                                if (selectedMode == "Duo") {
+                                    showFindRivalsScreen = true
+                                } else {
+                                    showAddParticipantsSheet = true
+                                }
+                            }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -557,6 +578,7 @@ fun SetAlarmScreen(
             }
         }
     }
+}
 }
 
 // -----------------------------------------------------------------------------

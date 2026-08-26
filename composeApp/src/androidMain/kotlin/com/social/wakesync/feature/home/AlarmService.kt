@@ -111,7 +111,7 @@ class AlarmService : Service() {
             }
         }
 
-        val timeoutMs = if (alarmMode.equals("Solo", ignoreCase = true)) {
+        val timeoutMs = if (alarmMode.equals("Solo", ignoreCase = true) || alarmMode.equals("Duo", ignoreCase = true)) {
             2 * 60 * 1000L // 2 minutes
         } else {
             AUTO_STOP_MS

@@ -79,9 +79,7 @@ fun AlarmPuzzleDuo(
     alarmId: String? = null,
     currentUserId: String? = null,
     onListenToDuoAlarm: ((String) -> kotlinx.coroutines.flow.Flow<String?>)? = null,
-    onSetDuoAlarmWinner: ((String, String) -> Unit)? = null,
-    onRecordWin: ((String, String) -> Unit)? = null,
-    onRecordLoss: ((String, String) -> Unit)? = null
+    onSetDuoAlarmWinner: ((String, String) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     var isUserDone by remember { mutableStateOf(false) }
@@ -126,13 +124,11 @@ fun AlarmPuzzleDuo(
                         isUserDone = true
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         delay(800)
-                        onRecordWin?.invoke(alarmId, AlarmState.activeAlarmMode)
                         onDismiss()
                     } else {
                         isRivalDone = true
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         delay(800)
-                        onRecordLoss?.invoke(alarmId, AlarmState.activeAlarmMode)
                         onFailure()
                     }
                 }
@@ -140,20 +136,15 @@ fun AlarmPuzzleDuo(
         }
     }
 
-    // Local Fallback simulation (only runs if Firestore listener is not available or offline)
-    val rivalSolveTime = remember { Random.nextLong(15000, 25000) }
+    // Failsafe backup timer: runs in parallel to prevent hang when offline
+    val rivalSolveTime = remember { Random.nextLong(20000, 30000) }
     LaunchedEffect(Unit) {
-        if (alarmId == null || onListenToDuoAlarm == null) {
-            delay(rivalSolveTime)
-            if (!isUserDone && !isRivalDone) {
-                isRivalDone = true
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                delay(1000)
-                if (alarmId != null) {
-                    onRecordLoss?.invoke(alarmId, AlarmState.activeAlarmMode)
-                }
-                onFailure()
-            }
+        delay(rivalSolveTime)
+        if (!isUserDone && !isRivalDone) {
+            isRivalDone = true
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            delay(1000)
+            onFailure()
         }
     }
 
@@ -162,14 +153,10 @@ fun AlarmPuzzleDuo(
         if (!isRivalDone && !isUserDone) {
             if (alarmId != null && onSetDuoAlarmWinner != null && currentUserId != null) {
                 onSetDuoAlarmWinner(alarmId, currentUserId)
-                onRecordWin?.invoke(alarmId, AlarmState.activeAlarmMode)
             } else {
                 // Local Fallback
                 isUserDone = true
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                if (alarmId != null) {
-                    onRecordWin?.invoke(alarmId, AlarmState.activeAlarmMode)
-                }
                 onDismiss()
             }
         }

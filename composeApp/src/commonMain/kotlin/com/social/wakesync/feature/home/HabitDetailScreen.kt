@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -90,18 +91,16 @@ fun HabitDetailScreen(
             }
         }
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
+            item {
                 // Top Card Container
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -252,7 +251,9 @@ fun HabitDetailScreen(
                         }
                     }
                 }
+            }
 
+            item {
                 // Grid Title: LAST 35 DAYS
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -349,53 +350,55 @@ fun HabitDetailScreen(
                 }
             }
 
-            // Bottom Buttons
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Delete Button
-                Button(
-                    onClick = { onDelete(habit.id) },
+            item {
+                // Bottom Buttons
+                Row(
                     modifier = Modifier
-                        .weight(0.35f)
-                        .height(52.dp)
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1E0F13),
-                        contentColor = AppColorPalette.LossRed
-                    )
+                        .fillMaxWidth()
+                        .navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Delete",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = titleFamily
-                    )
-                }
+                    // Delete Button
+                    Button(
+                        onClick = { onDelete(habit.id) },
+                        modifier = Modifier
+                            .weight(0.35f)
+                            .height(52.dp)
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1E0F13),
+                            contentColor = AppColorPalette.LossRed
+                        )
+                    ) {
+                        Text(
+                            text = "Delete",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = titleFamily
+                        )
+                    }
 
-                // Edit Habit Button
-                Button(
-                    onClick = { onEdit(habit) },
-                    modifier = Modifier
-                        .weight(0.65f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AppColorPalette.CyanCta,
-                        contentColor = Color.Black
-                    )
-                ) {
-                    Text(
-                        text = "Edit Habit",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = titleFamily
-                    )
+                    // Edit Habit Button
+                    Button(
+                        onClick = { onEdit(habit) },
+                        modifier = Modifier
+                            .weight(0.65f)
+                            .height(52.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AppColorPalette.CyanCta,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text(
+                            text = "Edit Habit",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = titleFamily
+                        )
+                    }
                 }
             }
         }

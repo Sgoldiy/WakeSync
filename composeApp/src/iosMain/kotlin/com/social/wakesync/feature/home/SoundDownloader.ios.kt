@@ -1,13 +1,19 @@
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package com.social.wakesync.feature.home
 
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.util.cio.*
-import io.ktor.utils.io.*
-import platform.Foundation.*
-import kotlinx.cinterop.*
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.readRawBytes
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
+import platform.Foundation.NSData
+import platform.Foundation.NSDocumentDirectory
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSURL
+import platform.Foundation.NSUserDomainMask
+import platform.Foundation.dataWithBytes
+import platform.Foundation.writeToURL
 
 class IosSoundDownloader : SoundDownloader {
     private val client = HttpClient()
@@ -17,14 +23,19 @@ class IosSoundDownloader : SoundDownloader {
         val urls = fileManager.URLsForDirectory(NSDocumentDirectory, NSUserDomainMask)
         val documentsDirectory = urls.first() as NSURL
         val soundFolder = documentsDirectory.URLByAppendingPathComponent("sounds")!!
-        
+
         if (!fileManager.fileExistsAtPath(soundFolder.path!!)) {
-            fileManager.createDirectoryAtURL(soundFolder, withIntermediateDirectories = true, attributes = null, error = null)
+            fileManager.createDirectoryAtURL(
+                soundFolder,
+                withIntermediateDirectories = true,
+                attributes = null,
+                error = null
+            )
         }
-        
+
         val destinationUrl = soundFolder.URLByAppendingPathComponent(fileName)!!
         if (fileManager.fileExistsAtPath(destinationUrl.path!!)) return destinationUrl.path
-        
+
         return try {
             val response = client.get(url)
             if (response.status.value in 200..299) {

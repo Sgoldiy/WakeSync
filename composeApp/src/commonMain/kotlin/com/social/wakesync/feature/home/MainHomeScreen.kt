@@ -97,6 +97,7 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
     var activeStory by remember { mutableStateOf<StoryItem?>(null) }
     var selectedUserForProfile by remember { mutableStateOf<String?>(null) }
+    var activeChatId by remember { mutableStateOf<String?>(null) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Emoji Picker State
@@ -107,6 +108,13 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
         if (AlarmState.activeAlarmMode == "Duo" || AlarmState.activeAlarmMode == "Group") {
             AlarmPuzzleDuo(
                 onDismiss = {
+                    val activeId = AlarmState.activeAlarmId ?: ""
+                    viewModel.recordAlarmWin(activeId, AlarmState.activeAlarmMode)
+                    AlarmState.isRinging = false
+                },
+                onFailure = {
+                    val activeId = AlarmState.activeAlarmId ?: ""
+                    viewModel.recordAlarmLoss(activeId, AlarmState.activeAlarmMode)
                     AlarmState.isRinging = false
                 },
                 titleFamily = titleFamily,
@@ -116,9 +124,7 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                 alarmId = AlarmState.activeAlarmId,
                 currentUserId = viewModel.getCurrentUserUid(),
                 onListenToDuoAlarm = { id -> viewModel.listenToDuoAlarm(id) },
-                onSetDuoAlarmWinner = { id, uid -> viewModel.setDuoAlarmWinner(id, uid) },
-                onRecordWin = { id, mode -> viewModel.recordAlarmWin(id, mode) },
-                onRecordLoss = { id, mode -> viewModel.recordAlarmLoss(id, mode) }
+                onSetDuoAlarmWinner = { id, uid -> viewModel.setDuoAlarmWinner(id, uid) }
             )
         } else {
             AlarmPuzzleSolo(
@@ -237,6 +243,13 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             titleFamily = titleFamily,
             interFamily = interFamily
         )
+    } else if (activeChatId != null) {
+        ChatDetailScreen(
+            chatId = activeChatId!!,
+            onBack = { activeChatId = null },
+            titleFamily = titleFamily,
+            interFamily = interFamily
+        )
     } else {
         Scaffold(
             bottomBar = {
@@ -289,6 +302,23 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                             interFamily = interFamily,
                             onStoryClick = { story -> activeStory = story },
                             onUserClick = { username -> selectedUserForProfile = username }
+                        )
+                    }
+
+                    HomeTab.LEADERBOARD -> {
+                        LeaderboardScreen(
+                            titleFamily = titleFamily,
+                            interFamily = interFamily,
+                            currentUsername = uiState.userName.ifEmpty { "nocturnaljake" },
+                            currentUserAvatar = uiState.avatarEmoji.ifEmpty { "🥱" }
+                        )
+                    }
+
+                    HomeTab.CHAT -> {
+                        MessagesScreen(
+                            titleFamily = titleFamily,
+                            interFamily = interFamily,
+                            onChatClick = { chat -> activeChatId = chat.id }
                         )
                     }
 
