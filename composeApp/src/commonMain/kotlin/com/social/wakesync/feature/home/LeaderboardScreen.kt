@@ -40,6 +40,7 @@ fun LeaderboardScreen(
     interFamily: FontFamily,
     currentUsername: String = "nocturnaljake",
     currentUserAvatar: String = "🥱",
+    onFindRivalsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf("Global") }
@@ -145,6 +146,17 @@ fun LeaderboardScreen(
                 fontWeight = FontWeight.W900,
                 fontFamily = titleFamily
             )
+
+            // Find Rivals Icon Button
+            androidx.compose.material3.IconButton(
+                onClick = onFindRivalsClick,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color.White.copy(alpha = 0.08f), CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+            ) {
+                Text("🔍", fontSize = 20.sp)
+            }
 
             // Switcher Tabs
             Row(
