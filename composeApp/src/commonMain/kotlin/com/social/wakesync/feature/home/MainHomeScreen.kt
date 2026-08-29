@@ -104,39 +104,62 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
     var showEmojiPicker by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
 
+    var showLockScreenHome by remember(AlarmState.isRinging) {
+        mutableStateOf(AlarmState.isRinging)
+    }
+
     if (AlarmState.isRinging) {
-        if (AlarmState.activeAlarmMode == "Duo" || AlarmState.activeAlarmMode == "Group") {
-            AlarmPuzzleDuo(
-                onDismiss = {
-                    val activeId = AlarmState.activeAlarmId ?: ""
-                    viewModel.recordAlarmWin(activeId, AlarmState.activeAlarmMode)
-                    AlarmState.isRinging = false
-                },
-                onFailure = {
-                    val activeId = AlarmState.activeAlarmId ?: ""
-                    viewModel.recordAlarmLoss(activeId, AlarmState.activeAlarmMode)
-                    AlarmState.isRinging = false
-                },
+        val onAlarmSolvedHome = {
+            val activeId = AlarmState.activeAlarmId ?: ""
+            viewModel.recordAlarmWin(activeId, AlarmState.activeAlarmMode)
+            AlarmState.isRinging = false
+            AlarmState.showStreakSave = true
+        }
+        val onAlarmFailedHome = {
+            val activeId = AlarmState.activeAlarmId ?: ""
+            viewModel.recordAlarmLoss(activeId, AlarmState.activeAlarmMode)
+            AlarmState.isRinging = false
+            AlarmState.showStreakBroken = true
+        }
+
+        if (showLockScreenHome) {
+            val groupAvatars = when (AlarmState.activeAlarmMode) {
+                "Group" -> listOf("🐺", "🦊", "🐻", "🦁")
+                "Duo"   -> listOf(uiState.avatarEmoji.ifEmpty { "🤯" })
+                else    -> emptyList()
+            }
+            AlarmLockScreen(
+                alarmTime = "6:30 AM",
+                alarmName = "Main Grind",
+                mode = AlarmState.activeAlarmMode,
+                challengeName = AlarmState.activeAlarmChallenge,
+                groupAvatars = groupAvatars,
                 titleFamily = titleFamily,
                 interFamily = interFamily,
-                userName = uiState.userName.ifEmpty { "You" },
-                userAvatar = uiState.avatarEmoji.ifEmpty { "🤯" },
-                alarmId = AlarmState.activeAlarmId,
-                currentUserId = viewModel.getCurrentUserUid(),
-                onListenToDuoAlarm = { id -> viewModel.listenToDuoAlarm(id) },
-                onSetDuoAlarmWinner = { id, uid -> viewModel.setDuoAlarmWinner(id, uid) }
+                onWake = { showLockScreenHome = false }
             )
         } else {
-            AlarmPuzzleSolo(
-                onDismiss = {
-                    val activeId = AlarmState.activeAlarmId ?: ""
-                    viewModel.recordAlarmWin(activeId, "Solo")
-                    AlarmState.isRinging = false
-                    AlarmState.showStreakSave = true
-                },
-                titleFamily = titleFamily,
-                interFamily = interFamily
-            )
+            if (AlarmState.activeAlarmMode == "Duo" || AlarmState.activeAlarmMode == "Group") {
+                AlarmPuzzleDuo(
+                    onDismiss = onAlarmSolvedHome,
+                    onFailure = onAlarmFailedHome,
+                    titleFamily = titleFamily,
+                    interFamily = interFamily,
+                    userName = uiState.userName.ifEmpty { "You" },
+                    userAvatar = uiState.avatarEmoji.ifEmpty { "🤯" },
+                    alarmId = AlarmState.activeAlarmId,
+                    currentUserId = viewModel.getCurrentUserUid(),
+                    onListenToDuoAlarm = { id -> viewModel.listenToDuoAlarm(id) },
+                    onSetDuoAlarmWinner = { id, uid -> viewModel.setDuoAlarmWinner(id, uid) }
+                )
+            } else {
+                AlarmPuzzleSolo(
+                    onDismiss = onAlarmSolvedHome,
+                    onFailure = onAlarmFailedHome,
+                    titleFamily = titleFamily,
+                    interFamily = interFamily
+                )
+            }
         }
     } else if (AlarmState.showStreakSave) {
         StreakSaveScreen(

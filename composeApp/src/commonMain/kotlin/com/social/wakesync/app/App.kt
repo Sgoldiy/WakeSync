@@ -31,6 +31,7 @@ import com.social.wakesync.feature.home.AlarmPuzzleGroup
 import com.social.wakesync.feature.home.StreakSaveScreen
 import com.social.wakesync.feature.home.StreakBrokenScreen
 import com.social.wakesync.feature.home.HomeViewModel
+import com.social.wakesync.feature.home.AlarmLockScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +70,10 @@ fun App(
         val homeViewModel: HomeViewModel = viewModel { HomeViewModel() }
         val homeUiState by homeViewModel.uiState.collectAsState()
 
+        var showLockScreen by remember(AlarmState.isRinging) {
+            mutableStateOf(AlarmState.isRinging)
+        }
+
         if (AlarmState.isRinging) {
             val onAlarmSolved = {
                 val activeId = AlarmState.activeAlarmId ?: ""
@@ -82,35 +87,55 @@ fun App(
                 onDismissAlarm()
                 AlarmState.showStreakBroken = true
             }
-            when (AlarmState.activeAlarmMode) {
-                "Duo" -> {
-                    AlarmPuzzleDuo(
-                        onDismiss = onAlarmSolved,
-                        onFailure = onAlarmFailed,
-                        titleFamily = titleFamily,
-                        interFamily = interFamily,
-                        userName = homeUiState.userName.ifEmpty { "You" },
-                        userAvatar = homeUiState.avatarEmoji.ifEmpty { "🤯" },
-                        alarmId = AlarmState.activeAlarmId,
-                        currentUserId = homeViewModel.getCurrentUserUid(),
-                        onListenToDuoAlarm = { id -> homeViewModel.listenToDuoAlarm(id) },
-                        onSetDuoAlarmWinner = { id, uid -> homeViewModel.setDuoAlarmWinner(id, uid) }
-                    )
+
+            if (showLockScreen) {
+                // Group avatars — shown only for Group/Duo mode
+                val groupAvatars = when (AlarmState.activeAlarmMode) {
+                    "Group" -> listOf("🐺", "🦊", "🐻", "🦁")
+                    "Duo"   -> listOf(homeUiState.avatarEmoji.ifEmpty { "🤯" })
+                    else    -> emptyList()
                 }
-                "Group" -> {
-                    AlarmPuzzleGroup(
-                        onDismiss = onAlarmSolved,
-                        titleFamily = titleFamily,
-                        interFamily = interFamily
-                    )
-                }
-                else -> {
-                    AlarmPuzzleSolo(
-                        onDismiss = onAlarmSolved,
-                        onFailure = onAlarmFailed,
-                        titleFamily = titleFamily,
-                        interFamily = interFamily
-                    )
+                AlarmLockScreen(
+                    alarmTime = "6:30 AM",
+                    alarmName = "Main Grind",
+                    mode = AlarmState.activeAlarmMode,
+                    challengeName = AlarmState.activeAlarmChallenge,
+                    groupAvatars = groupAvatars,
+                    titleFamily = titleFamily,
+                    interFamily = interFamily,
+                    onWake = { showLockScreen = false }
+                )
+            } else {
+                when (AlarmState.activeAlarmMode) {
+                    "Duo" -> {
+                        AlarmPuzzleDuo(
+                            onDismiss = onAlarmSolved,
+                            onFailure = onAlarmFailed,
+                            titleFamily = titleFamily,
+                            interFamily = interFamily,
+                            userName = homeUiState.userName.ifEmpty { "You" },
+                            userAvatar = homeUiState.avatarEmoji.ifEmpty { "🤯" },
+                            alarmId = AlarmState.activeAlarmId,
+                            currentUserId = homeViewModel.getCurrentUserUid(),
+                            onListenToDuoAlarm = { id -> homeViewModel.listenToDuoAlarm(id) },
+                            onSetDuoAlarmWinner = { id, uid -> homeViewModel.setDuoAlarmWinner(id, uid) }
+                        )
+                    }
+                    "Group" -> {
+                        AlarmPuzzleGroup(
+                            onDismiss = onAlarmSolved,
+                            titleFamily = titleFamily,
+                            interFamily = interFamily
+                        )
+                    }
+                    else -> {
+                        AlarmPuzzleSolo(
+                            onDismiss = onAlarmSolved,
+                            onFailure = onAlarmFailed,
+                            titleFamily = titleFamily,
+                            interFamily = interFamily
+                        )
+                    }
                 }
             }
         } else if (AlarmState.showStreakSave) {
