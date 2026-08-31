@@ -228,7 +228,12 @@ fun LeaderboardScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (selectedTab == "Global") {
+        if (selectedMode == "Group") {
+            GroupLeaderboardScreen(
+                titleFamily = titleFamily,
+                interFamily = interFamily
+            )
+        } else if (selectedTab == "Global") {
             // Global Layout: Top 3 Podium
             val top1 = activeList.firstOrNull { it.rank == 1 }
             val top2 = activeList.firstOrNull { it.rank == 2 }
