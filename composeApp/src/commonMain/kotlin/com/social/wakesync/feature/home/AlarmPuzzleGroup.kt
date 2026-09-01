@@ -104,6 +104,16 @@ fun AlarmPuzzleGroup(
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Group Alarm Header
+        Text(
+            text = "Group Alarm",
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.W900,
+            fontFamily = titleFamily,
+            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+        )
+
         // Leaderboard List
         LazyColumn(
             modifier = Modifier

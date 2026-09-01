@@ -168,7 +168,7 @@ fun SetAlarmScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF131829)),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+                    border = BorderStroke(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.12f))
                 ) {
                     Column(
                         modifier = Modifier.padding(vertical = 6.dp, horizontal = 20.dp),
@@ -245,7 +245,7 @@ fun SetAlarmScreen(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 // REPEAT Section
                 SectionHeader("REPEAT", interFamily)
                 Spacer(modifier = Modifier.height(12.dp))
@@ -269,7 +269,7 @@ fun SetAlarmScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // ALARM MODE Section
                 SectionHeader("ALARM MODE", interFamily)
@@ -384,38 +384,19 @@ fun SetAlarmScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // ALARM SOUND Section
-                SectionHeader("ALARM SOUND", interFamily)
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(sounds) { sound ->
-                        SoundCard(
-                            sound = sound,
-                            isSelected = selectedSound?.id == sound.id,
-                            onClick = { onSoundSelected(sound) }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // CHALLENGE Section
                 SectionHeader("CHALLENGE", interFamily)
                 Spacer(modifier = Modifier.height(12.dp))
-                FlowRow(
+                LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(
+                    items(listOf(
                         "Math", "Memory", "Stroop", "Word Scramble", "Shake",
                         "Speed Tap", "Odd One Out", "Sliding Tiles", "Orb Focus", "Rapid Tap"
-                    ).forEach { challenge ->
+                    )) { challenge ->
                         ChallengeChip(
                             text = challenge,
                             isSelected = selectedChallenge == challenge,
@@ -482,7 +463,7 @@ fun SetAlarmScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // PENALTY Section - MATCHING IMAGE STYLE
                 PenaltyCard(
@@ -534,7 +515,7 @@ fun SetAlarmScreen(
                     Text(
                         "Set Alarm ⏰",
                         color = Color.Black,
-                        fontSize = 17.sp,
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = interFamily
                     )

@@ -389,7 +389,7 @@ fun ProfileScreen(
                     )
                 } else {
                     Text(
-                        text = "Continue ⟶",
+                        text = "Continue →",
                         fontSize = 19.sp,
                         fontWeight = FontWeight.W800,
                         fontFamily = titleFamily,

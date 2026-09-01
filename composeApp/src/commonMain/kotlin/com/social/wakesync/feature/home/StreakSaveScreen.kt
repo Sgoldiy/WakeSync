@@ -327,7 +327,7 @@ fun StreakSaveScreen(
                 contentPadding = PaddingValues(0.dp)
             ) {
                 Text(
-                    text = "🔥 Share the W",
+                    text = "📣 Share the W",
                     color = Color.Black,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.W900,

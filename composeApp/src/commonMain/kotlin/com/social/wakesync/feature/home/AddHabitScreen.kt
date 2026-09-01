@@ -445,7 +445,7 @@ fun AddHabitScreen(
                         fontWeight = FontWeight.Black,
                         fontFamily = titleFamily
                     )
-                    Text("🔄", fontSize = 14.sp)
+                    Text("🔁", fontSize = 14.sp)
                 }
             }
         }

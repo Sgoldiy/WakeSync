@@ -705,7 +705,7 @@ fun HomeHeader(
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(AppColorPalette.DeepSurface)
-                    .border(2.dp, AppColorPalette.WinGreen, CircleShape),
+                    .border(2.dp, AppColorPalette.LossRed, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

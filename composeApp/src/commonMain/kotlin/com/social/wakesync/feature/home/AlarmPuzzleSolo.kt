@@ -185,6 +185,13 @@ fun AlarmPuzzleSolo(
                     fontFamily = titleFamily,
                     letterSpacing = (-2).sp
                 )
+                Text(
+                    text = "Wake up. Don't choke.",
+                    color = Color.White.copy(alpha = 0.55f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.W400,
+                    fontFamily = interFamily
+                )
                 
                 // 60s Countdown Timer Badge & Attempt Indicator
                 Row(
@@ -260,6 +267,16 @@ fun AlarmPuzzleSolo(
                 }
             }
 
+            // Solve Label
+            Text(
+                text = "SOLVE TO DISMISS",
+                color = Color.White.copy(alpha = 0.4f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = interFamily,
+                letterSpacing = 1.sp
+            )
+
             // Active Bed-Friendly Task Component
             AnimatedContent(
                 targetState = Pair(activePuzzleType, currentStage),
@@ -330,7 +347,7 @@ private fun SoloMathComponent(
         ) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "${puzzle.question} = ${currentInput.ifEmpty { "?" }}",
+                    text = "${puzzle.question} = ${currentInput.ifEmpty { "···" }}",
                     color = AppColorPalette.CyanCta,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.W900,

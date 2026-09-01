@@ -207,7 +207,7 @@ fun WakeSyncSplashScreen(
                     modifier = Modifier
                         .width(minSide * 0.14f)
                         .height(2.dp)
-                        .background(AppColorPalette.WinGreen, RoundedCornerShape(999.dp)),
+                        .background(AppColorPalette.CyanCta, RoundedCornerShape(999.dp)),
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(

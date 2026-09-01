@@ -183,7 +183,7 @@ fun OnboardingScreen1(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Next",
+                        text = "Next →",
                         color = Color(0xFF02121B),
                         fontSize = 19.sp,
                         fontWeight = FontWeight.W800,

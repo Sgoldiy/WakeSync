@@ -322,7 +322,7 @@ fun AlarmPuzzleDuo(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text("PARTNER", color = AppColorPalette.LossRed, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = interFamily, letterSpacing = 1.sp)
+                            Text("RIVAL", color = AppColorPalette.LossRed, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = interFamily, letterSpacing = 1.sp)
                             Box(
                                 modifier = Modifier
                                     .size(64.dp)
@@ -362,6 +362,29 @@ fun AlarmPuzzleDuo(
                     Text("VS", color = AppColorPalette.CyanCta, fontSize = 13.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
                 }
             }
+        }
+
+        // Pressure Copy Text
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = "Don't let them win again. 💀",
+                color = AppColorPalette.LossRed,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = interFamily
+            )
+            Text(
+                text = "${rivalName} beat you 3 times last week",
+                color = Color.White.copy(alpha = 0.45f),
+                fontSize = 12.sp,
+                fontFamily = interFamily
+            )
         }
 
         // Active Duo Challenge Title & 120s Countdown Timer Badge

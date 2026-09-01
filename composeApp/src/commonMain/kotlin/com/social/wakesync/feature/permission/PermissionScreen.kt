@@ -134,7 +134,7 @@ fun PermissionScreen(
                 PermissionItem(
                     title = "Camera",
                     description = "Photo proof for challenges. No cam = no alibi.",
-                    emoji = "📸",
+                    emoji = "📷",
                     isGranted = cameraGranted,
                     onToggle = { 
                         if (!it) return@PermissionItem
@@ -202,7 +202,7 @@ fun PermissionScreen(
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
                 Text(
-                    text = "All set. Let's go",
+                    text = "All set. Let's go →",
                     fontSize = 19.sp,
                     fontWeight = FontWeight.W800,
                     fontFamily = titleFamily,
