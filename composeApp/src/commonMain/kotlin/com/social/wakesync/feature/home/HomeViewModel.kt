@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
@@ -390,6 +391,14 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    fun getLeaderboard(mode: String, isGlobal: Boolean): Flow<List<LeaderboardUser>> {
+        return homeRepository.getLeaderboard(mode, isGlobal)
+    }
+
+    fun getGroupLeaderboard(groupId: String = "Morning Crew"): Flow<List<GroupMember>> {
+        return homeRepository.getGroupLeaderboard(groupId)
+    }
+
     fun autoSetAlarm() {
         addAlarm(
             hour = 6,
@@ -581,7 +590,7 @@ class HomeViewModel : ViewModel() {
     private fun isTimestampToday(timestamp: Long): Boolean {
         val timeZone = TimeZone.currentSystemDefault()
         val now = Clock.System.now().toLocalDateTime(timeZone).date
-        val alarmDate = kotlinx.datetime.Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(timeZone).date
+        val alarmDate = Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(timeZone).date
         return now == alarmDate
     }
 }

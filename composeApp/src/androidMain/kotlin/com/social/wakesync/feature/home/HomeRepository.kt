@@ -38,8 +38,9 @@ class AndroidHomeRepository : HomeRepository {
                     val frequency = doc.getString("frequency") ?: "Daily"
                     val reminderTime = doc.getString("reminderTime") ?: "6:15 AM"
                     val partnerUsername = doc.getString("partnerUsername")
+                    val bondName = doc.getString("bondName")
                     
-                    Habit(doc.id, title, iconType, isDone, streak, frequency, reminderTime, partnerUsername)
+                    Habit(doc.id, title, iconType, isDone, streak, frequency, reminderTime, partnerUsername, bondName)
                 } ?: emptyList()
                 
                 trySend(habits)
@@ -152,7 +153,10 @@ class AndroidHomeRepository : HomeRepository {
                         soundUrl = doc.getString("soundUrl"),
                         soundName = doc.getString("soundName") ?: "Default",
                         soundId = doc.getString("soundId"),
-                        partnerUid = doc.getString("partnerUid")
+                        partnerUid = doc.getString("partnerUid"),
+                        partnerUsername = doc.getString("partnerUsername"),
+                        mathDifficulty = doc.getString("mathDifficulty") ?: "Medium",
+                        bondName = doc.getString("bondName")
                     )
                 } ?: emptyList()
                 trySend(alarms)
@@ -967,6 +971,96 @@ class AndroidHomeRepository : HomeRepository {
         } catch (e: Exception) {
             // fail silently
         }
+    }
+
+    override fun getLeaderboard(mode: String, isGlobal: Boolean): Flow<List<LeaderboardUser>> = callbackFlow {
+        val currentUserId = auth.currentUser?.uid
+        val sortField = when (mode) {
+            "Duo" -> "duoAlarmWins"
+            "Group" -> "groupAlarmWins"
+            else -> "soloAlarmWins"
+        }
+
+        val limitCount = if (isGlobal) 50L else 10L
+        val subscription = db.collection("users")
+            .orderBy(sortField, Query.Direction.DESCENDING)
+            .limit(limitCount)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                var rankIndex = 1
+                val users = snapshot?.documents?.mapNotNull { doc ->
+                    val username = doc.getString("username") ?: return@mapNotNull null
+                    val avatar = doc.getString("avatar") ?: "👤"
+                    val wins = doc.getLong(sortField)?.toInt() ?: doc.getLong("wins")?.toInt() ?: 0
+                    val streak = when (mode) {
+                        "Duo" -> doc.getLong("duoAlarmStreak")?.toInt() ?: 0
+                        "Group" -> doc.getLong("groupAlarmStreak")?.toInt() ?: 0
+                        else -> doc.getLong("soloAlarmStreak")?.toInt() ?: doc.getLong("streak")?.toInt() ?: 0
+                    }
+                    val losses = when (mode) {
+                        "Duo" -> doc.getLong("duoAlarmLosses")?.toInt() ?: 0
+                        "Group" -> doc.getLong("groupAlarmLosses")?.toInt() ?: 0
+                        else -> doc.getLong("soloAlarmLosses")?.toInt() ?: doc.getLong("losses")?.toInt() ?: 0
+                    }
+
+                    val isUser = (doc.id == currentUserId)
+                    LeaderboardUser(
+                        rank = rankIndex++,
+                        username = if (isUser && !isGlobal) "YOU" else username,
+                        avatar = avatar,
+                        score = (wins * 100) + (streak * 10),
+                        streak = streak,
+                        isCurrentUser = isUser,
+                        isRedLoss = losses > 3
+                    )
+                } ?: emptyList()
+
+                trySend(users)
+            }
+
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getGroupLeaderboard(groupId: String): Flow<List<GroupMember>> = callbackFlow {
+        val currentUserId = auth.currentUser?.uid
+        val subscription = db.collection("users")
+            .orderBy("groupAlarmWins", Query.Direction.DESCENDING)
+            .limit(10)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                var rankIndex = 1
+                val members = snapshot?.documents?.mapNotNull { doc ->
+                    val username = doc.getString("username") ?: return@mapNotNull null
+                    val avatar = doc.getString("avatar") ?: "👤"
+                    val wins = doc.getLong("groupAlarmWins")?.toInt() ?: doc.getLong("wins")?.toInt() ?: 0
+                    val streak = doc.getLong("groupAlarmStreak")?.toInt() ?: doc.getLong("streak")?.toInt() ?: 0
+                    val losses = doc.getLong("groupAlarmLosses")?.toInt() ?: doc.getLong("losses")?.toInt() ?: 0
+                    val isUser = (doc.id == currentUserId)
+
+                    val calculatedPoints = (wins * 3) + streak
+                    GroupMember(
+                        rank = rankIndex++,
+                        username = if (isUser) "YOU" else username,
+                        avatar = avatar,
+                        points = calculatedPoints,
+                        wins = wins,
+                        isCurrentUser = isUser,
+                        isRedHighlight = losses > 2
+                    )
+                } ?: emptyList()
+
+                trySend(members)
+            }
+
+        awaitClose { subscription.remove() }
     }
 }
 

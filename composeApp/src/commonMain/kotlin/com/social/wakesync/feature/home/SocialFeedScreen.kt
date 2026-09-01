@@ -235,11 +235,12 @@ fun SocialFeedScreen(
             )
         }
 
-        // Notifications Bottom Sheet Mock
+        // Notifications Full Screen
         if (notificationsActive) {
-            NotificationsOverlay(
-                onDismiss = { notificationsActive = false },
-                interFamily = interFamily
+            NotificationsScreen(
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                onBack = { notificationsActive = false }
             )
         }
 

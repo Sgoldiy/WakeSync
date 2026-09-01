@@ -99,6 +99,9 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
     var selectedUserForProfile by remember { mutableStateOf<String?>(null) }
     var activeChatId by remember { mutableStateOf<String?>(null) }
     var activeFindRivalsId by remember { mutableStateOf(false) }
+    var showSettingsScreen by remember { mutableStateOf(false) }
+    var showStatsDeepDiveScreen by remember { mutableStateOf(false) }
+    var showPremiumScreen by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Emoji Picker State
@@ -130,8 +133,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                 else    -> emptyList()
             }
             AlarmLockScreen(
-                alarmTime = "6:30 AM",
-                alarmName = "Main Grind",
+                alarmTime = uiState.nextAlarmTime,
+                alarmName = "${AlarmState.activeAlarmMode} Alarm",
                 mode = AlarmState.activeAlarmMode,
                 challengeName = AlarmState.activeAlarmChallenge,
                 groupAvatars = groupAvatars,
@@ -164,12 +167,19 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
         }
     } else if (AlarmState.showStreakSave) {
         StreakSaveScreen(
+            streakDays = uiState.streak,
+            finishPosition = 1,
+            totalParticipants = if (AlarmState.activeAlarmMode == "Solo") 1 else 2,
+            sleepingFriends = if (AlarmState.activeAlarmMode == "Solo") emptyList() else listOf("🦁"),
+            friendsLostCount = 0,
             onBackToHome = { AlarmState.showStreakSave = false },
             titleFamily = titleFamily,
             interFamily = interFamily
         )
     } else if (AlarmState.showStreakBroken) {
         StreakBrokenScreen(
+            previousStreak = uiState.streak + 3,
+            currentStreak = uiState.streak,
             onBackToHome = { AlarmState.showStreakBroken = false },
             titleFamily = titleFamily,
             interFamily = interFamily
@@ -277,6 +287,33 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             titleFamily = titleFamily,
             interFamily = interFamily
         )
+    } else if (showPremiumScreen) {
+        PremiumScreen(
+            onClose = { showPremiumScreen = false },
+            titleFamily = titleFamily,
+            interFamily = interFamily
+        )
+    } else if (showSettingsScreen) {
+        SettingsScreen(
+            titleFamily = titleFamily,
+            interFamily = interFamily,
+            currentUsername = uiState.userName.ifEmpty { "nocturnaljake" },
+            onBack = { showSettingsScreen = false },
+            onPremiumClick = { showPremiumScreen = true }
+        )
+    } else if (showStatsDeepDiveScreen) {
+        StatsDeepDiveScreen(
+            onBack = { showStatsDeepDiveScreen = false },
+            titleFamily = titleFamily,
+            interFamily = interFamily,
+            overallWinRate = 78,
+            soloWinRate = 91,
+            duoWinRate = 72,
+            groupWinRate = 68,
+            currentStreak = uiState.streak,
+            longestStreak = 34,
+            averageStreak = 11
+        )
     } else if (activeChatId != null) {
         ChatDetailScreen(
             chatId = activeChatId!!,
@@ -345,7 +382,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                             interFamily = interFamily,
                             currentUsername = uiState.userName.ifEmpty { "nocturnaljake" },
                             currentUserAvatar = uiState.avatarEmoji.ifEmpty { "🥱" },
-                            onFindRivalsClick = { activeFindRivalsId = true }
+                            onFindRivalsClick = { activeFindRivalsId = true },
+                            viewModel = viewModel
                         )
                     }
 
@@ -354,6 +392,21 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                             titleFamily = titleFamily,
                             interFamily = interFamily,
                             onChatClick = { chat -> activeChatId = chat.id }
+                        )
+                    }
+
+                    HomeTab.PROFILE -> {
+                        MyProfileScreen(
+                            titleFamily = titleFamily,
+                            interFamily = interFamily,
+                            username = uiState.userName.ifEmpty { "nocturnaljake" },
+                            avatarEmoji = uiState.avatarEmoji.ifEmpty { "🥱" },
+                            streak = uiState.streak,
+                            wins = uiState.wins,
+                            losses = uiState.losses,
+                            globalRank = uiState.rank.ifEmpty { "#47" },
+                            onEditClick = { showEmojiPicker = true },
+                            onStatsClick = { showStatsDeepDiveScreen = true }
                         )
                     }
 

@@ -41,10 +41,14 @@ fun LeaderboardScreen(
     currentUsername: String = "nocturnaljake",
     currentUserAvatar: String = "🥱",
     onFindRivalsClick: () -> Unit = {},
+    viewModel: HomeViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf("Global") }
     var selectedMode by remember { mutableStateOf("Solo") }
+
+    val liveLeaderboardState = viewModel?.getLeaderboard(selectedMode, selectedTab == "Global")?.collectAsState(initial = emptyList())
+    val liveList = liveLeaderboardState?.value
 
     // Mock datasets for Solo
     val globalSolo = remember(currentUsername, currentUserAvatar) {
@@ -116,11 +120,15 @@ fun LeaderboardScreen(
     }
 
     // Resolve list based on tab + mode
-    val activeList = remember(selectedTab, selectedMode, globalSolo, friendsSolo, globalDuo, friendsDuo, globalGroup, friendsGroup) {
-        when (selectedMode) {
-            "Solo" -> if (selectedTab == "Global") globalSolo else friendsSolo
-            "Duo" -> if (selectedTab == "Global") globalDuo else friendsDuo
-            else -> if (selectedTab == "Global") globalGroup else friendsGroup
+    val activeList = remember(selectedTab, selectedMode, liveList, globalSolo, friendsSolo, globalDuo, friendsDuo, globalGroup, friendsGroup) {
+        if (liveList != null && liveList.isNotEmpty()) {
+            liveList
+        } else {
+            when (selectedMode) {
+                "Solo" -> if (selectedTab == "Global") globalSolo else friendsSolo
+                "Duo" -> if (selectedTab == "Global") globalDuo else friendsDuo
+                else -> if (selectedTab == "Global") globalGroup else friendsGroup
+            }
         }
     }
 
@@ -231,7 +239,8 @@ fun LeaderboardScreen(
         if (selectedMode == "Group") {
             GroupLeaderboardScreen(
                 titleFamily = titleFamily,
-                interFamily = interFamily
+                interFamily = interFamily,
+                viewModel = viewModel
             )
         } else if (selectedTab == "Global") {
             // Global Layout: Top 3 Podium

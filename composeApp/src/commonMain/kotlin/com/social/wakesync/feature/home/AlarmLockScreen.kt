@@ -1,5 +1,7 @@
 package com.social.wakesync.feature.home
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -380,72 +382,125 @@ fun AlarmLockScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── Swipe to Wake Up bar ──────────────────────────────────────────────
-            Box(
+            // ── Real Interactive Swipe to Wake Up Drag Bar ────────────────────────────
+            val haptic = LocalHapticFeedback.current
+            var dragOffsetX by remember { mutableStateOf(0f) }
+            var isSwipedCompleted by remember { mutableStateOf(false) }
+
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
                     .clip(RoundedCornerShape(99.dp))
                     .background(AppColorPalette.Surface)
                     .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(99.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onWake() }
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val maxTrackWidthPx = with(density) { (maxWidth - 64.dp).toPx() }
+
+                val animatedOffsetX by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = if (isSwipedCompleted) maxTrackWidthPx else dragOffsetX,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = 0.75f,
+                        stiffness = 300f
+                    )
+                )
+
+                val progress = (animatedOffsetX / maxTrackWidthPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                val currentOffsetDp = with(density) { animatedOffsetX.toDp() }
+
+                // Expanding glowing track fill behind handle
+                Box(
+                    modifier = Modifier
+                        .height(48.dp)
+                        .width(currentOffsetDp + 48.dp)
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color(0xFFFF3D71).copy(alpha = 0.25f),
+                                    AppColorPalette.StreakFireStart.copy(alpha = 0.4f + progress * 0.5f)
+                                )
+                            )
+                        )
+                )
+
+                // Guide Text with Fading Alpha as knob slides over
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 64.dp, end = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Pulsing glowing wake circle
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .scale(pulseScale)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        AppColorPalette.StreakFireStart,
-                                        Color(0xFFFF3D71)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = "⚡", fontSize = 20.sp)
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    // Text content
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Swipe to wake up",
-                            color = Color.White,
+                            color = Color.White.copy(alpha = (1f - progress * 1.3f).coerceIn(0f, 1f)),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.W700,
                             fontFamily = interFamily
                         )
                         Text(
                             text = "No snooze. No dismiss. Just win.",
-                            color = Color.White.copy(alpha = 0.4f),
+                            color = Color.White.copy(alpha = (0.4f * (1f - progress * 1.3f)).coerceIn(0f, 0.4f)),
                             fontSize = 12.sp,
                             fontFamily = interFamily,
                             fontWeight = FontWeight.W400
                         )
                     }
 
-                    // Arrow indicator
                     Icon(
                         imageVector = Icons.Rounded.ChevronRight,
                         contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.35f),
+                        tint = Color.White.copy(alpha = (0.35f * (1f - progress * 1.3f)).coerceIn(0f, 0.35f)),
                         modifier = Modifier.size(24.dp)
                     )
+                }
+
+                // Draggable Glowing ⚡ Knob Handle
+                Box(
+                    modifier = Modifier
+                        .offset(x = currentOffsetDp)
+                        .size(48.dp)
+                        .scale(if (progress > 0.1f) 1f else pulseScale)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    AppColorPalette.StreakFireStart,
+                                    Color(0xFFFF3D71)
+                                )
+                            )
+                        )
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragStart = { },
+                                onDragEnd = {
+                                    if (dragOffsetX >= maxTrackWidthPx * 0.65f) {
+                                        isSwipedCompleted = true
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        onWake()
+                                    } else {
+                                        dragOffsetX = 0f
+                                    }
+                                },
+                                onDragCancel = {
+                                    dragOffsetX = 0f
+                                },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    if (!isSwipedCompleted) {
+                                        dragOffsetX = (dragOffsetX + dragAmount).coerceIn(0f, maxTrackWidthPx)
+                                    }
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "⚡", fontSize = 20.sp)
                 }
             }
 

@@ -160,6 +160,26 @@ class IosHomeRepository : HomeRepository {
         _stats.value = updated
         return Result.success(Unit)
     }
+
+    override fun getLeaderboard(mode: String, isGlobal: Boolean): Flow<List<LeaderboardUser>> = MutableStateFlow(
+        listOf(
+            LeaderboardUser(1, "5amclub_dani", "🐺", 8820, 89),
+            LeaderboardUser(2, "maya.rises", "🦁", 7200, 41),
+            LeaderboardUser(3, "YOU", "🥱", 4200, 23, isCurrentUser = true),
+            LeaderboardUser(4, "grind.rio", "🐻", 6200, 15),
+            LeaderboardUser(5, "nocturnaleve", "🐱", 1800, 3, isRedLoss = true)
+        )
+    )
+
+    override fun getGroupLeaderboard(groupId: String): Flow<List<GroupMember>> = MutableStateFlow(
+        listOf(
+            GroupMember(1, "5amclub_dani", "🐺", 42, 14),
+            GroupMember(2, "maya.rises", "🦁", 38, 12),
+            GroupMember(3, "YOU", "🥱", 31, 9, isCurrentUser = true),
+            GroupMember(4, "grind.rio", "🐻", 28, 8),
+            GroupMember(5, "nocturnaleve", "🐱", 11, 3, isRedHighlight = true)
+        )
+    )
 }
 
 actual fun getHomeRepository(): HomeRepository = IosHomeRepository()

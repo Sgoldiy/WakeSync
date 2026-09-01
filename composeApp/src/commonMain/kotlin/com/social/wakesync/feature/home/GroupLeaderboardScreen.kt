@@ -41,10 +41,10 @@ fun GroupLeaderboardScreen(
     interFamily: FontFamily,
     modifier: Modifier = Modifier,
     groupTitle: String = "Morning Crew 🌅",
-    memberCount: Int = 5,
     resetDays: Int = 12,
     onBack: (() -> Unit)? = null,
-    members: List<GroupMember> = remember {
+    viewModel: HomeViewModel? = null,
+    initialMembers: List<GroupMember> = remember {
         listOf(
             GroupMember(1, "5amclub_dani", "🐺", 42, 14),
             GroupMember(2, "maya.rises", "🦁", 38, 12),
@@ -54,6 +54,10 @@ fun GroupLeaderboardScreen(
         )
     }
 ) {
+    val liveMembersState = viewModel?.getGroupLeaderboard(groupTitle)?.collectAsState(initial = initialMembers)
+    val members = liveMembersState?.value ?: initialMembers
+    val memberCount = members.size.coerceAtLeast(1)
+
     Column(
         modifier = modifier
             .fillMaxSize()

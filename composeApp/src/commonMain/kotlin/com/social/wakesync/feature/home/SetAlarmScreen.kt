@@ -32,7 +32,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.Button
@@ -62,7 +61,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
@@ -305,7 +303,6 @@ fun SetAlarmScreen(
                             .border(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                             .clickable {
                                 if (selectedMode == "Duo") {
-                                    showFindRivalsScreen = true
                                 } else {
                                     showAddParticipantsSheet = true
                                 }
@@ -812,6 +809,7 @@ private fun AddParticipantsSheetContent(
     }
 }
 
+@Suppress("FrequentlyChangingValue")
 @Composable
 fun WheelTimePicker(
     items: List<String>,

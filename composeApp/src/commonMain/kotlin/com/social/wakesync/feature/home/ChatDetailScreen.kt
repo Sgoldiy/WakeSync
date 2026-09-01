@@ -88,6 +88,19 @@ fun ChatDetailScreen(
             .fillMaxSize()
             .background(AppColorPalette.VoidBg)
     ) {
+        var showGroupSettings by remember { mutableStateOf(false) }
+
+        if (showGroupSettings) {
+            GroupSettingsScreen(
+                onBack = { showGroupSettings = false },
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                groupName = chatTitle,
+                groupAvatar = chatAvatar
+            )
+            return
+        }
+
         // Top Bar
         Row(
             modifier = Modifier
@@ -106,42 +119,51 @@ fun ChatDetailScreen(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Avatar
-            Box(
+            // Avatar + Title Row (Clickable to open Group Settings)
+            Row(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AppColorPalette.Surface)
-                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
+                    .weight(1f)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { showGroupSettings = true },
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = chatAvatar,
-                    fontSize = 20.sp
-                )
-            }
+                    // Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(AppColorPalette.Surface)
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = chatAvatar,
+                            fontSize = 20.sp
+                        )
+                    }
 
-            Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = chatTitle,
-                    color = Color.White,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.W700,
-                    fontFamily = interFamily
-                )
-                Text(
-                    text = "5 members · 3 active now",
-                    color = Color.White.copy(alpha = 0.4f),
-                    fontSize = 12.sp,
-                    fontFamily = interFamily,
-                    fontWeight = FontWeight.W400
-                )
+                    Column {
+                        Text(
+                            text = chatTitle,
+                            color = Color.White,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.W700,
+                            fontFamily = interFamily
+                        )
+                        Text(
+                            text = "5 members · 3 active now",
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontSize = 12.sp,
+                            fontFamily = interFamily,
+                            fontWeight = FontWeight.W400
+                        )
+                    }
+                }
             }
-        }
 
         HorizontalDivider(color = Color.White.copy(alpha = 0.05f), thickness = 1.dp)
 
@@ -175,6 +197,44 @@ fun ChatDetailScreen(
                 fontWeight = FontWeight.W700,
                 fontFamily = interFamily,
                 modifier = Modifier.clickable { /* View details action */ }
+            )
+        }
+
+        var showKickVoteSheet by remember { mutableStateOf(false) }
+
+        if (showKickVoteSheet) {
+            KickVoteBottomSheet(
+                onDismiss = { showKickVoteSheet = false },
+                titleFamily = titleFamily,
+                interFamily = interFamily
+            )
+        }
+
+        // Active Kick Vote Banner
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(AppColorPalette.LossRed.copy(alpha = 0.08f))
+                .clickable { showKickVoteSheet = true }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "💀", fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Kick Vote: nocturnaleve (3/4 votes needed)",
+                color = AppColorPalette.LossRed,
+                fontSize = 13.sp,
+                fontFamily = interFamily,
+                fontWeight = FontWeight.W600,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "Vote",
+                color = AppColorPalette.LossRed,
+                fontSize = 13.sp,
+                fontFamily = interFamily,
+                fontWeight = FontWeight.W700
             )
         }
 

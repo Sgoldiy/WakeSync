@@ -24,6 +24,8 @@ interface HomeRepository {
     suspend fun deleteHabit(habitId: String): Result<Unit>
     suspend fun updateHabit(habit: Habit): Result<Unit>
     suspend fun recordAlarmResult(alarmId: String, mode: String, isWin: Boolean): Result<Unit>
+    fun getLeaderboard(mode: String, isGlobal: Boolean): Flow<List<LeaderboardUser>>
+    fun getGroupLeaderboard(groupId: String = "Morning Crew"): Flow<List<GroupMember>>
 }
 
 data class SoundMetadata(

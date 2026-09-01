@@ -96,8 +96,8 @@ fun App(
                     else    -> emptyList()
                 }
                 AlarmLockScreen(
-                    alarmTime = "6:30 AM",
-                    alarmName = "Main Grind",
+                    alarmTime = homeUiState.nextAlarmTime,
+                    alarmName = "${AlarmState.activeAlarmMode} Alarm",
                     mode = AlarmState.activeAlarmMode,
                     challengeName = AlarmState.activeAlarmChallenge,
                     groupAvatars = groupAvatars,
