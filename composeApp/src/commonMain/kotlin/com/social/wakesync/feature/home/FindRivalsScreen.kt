@@ -25,9 +25,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.ui.components.EmptyState
 import com.social.wakesync.ui.theme.AppColorPalette
 import com.social.wakesync.ui.utils.BackHandler
-import kotlin.random.Random
+import kotlinx.coroutines.launch
 
 data class RivalItem(
     val username: String,
@@ -43,24 +44,37 @@ fun FindRivalsScreen(
     onRivalSelected: (String) -> Unit,
     titleFamily: FontFamily,
     interFamily: FontFamily,
+    viewModel: HomeViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
     var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf(emptyList<RivalItem>()) }
+    var isSearching by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
-    val suggestedRivals = remember {
-        listOf(
-            RivalItem("5amclub_dani", "🐺", 89, "#3", 3),
-            RivalItem("earlybird_rin", "🐦", 44, "#12", 1),
-            RivalItem("grindset.alex", "🦅", 29, "#21", 2),
-            RivalItem("zero_snooze", "🐊", 66, "#5", 0)
-        )
+    // Search Firestore when query changes
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.length >= 2 && viewModel != null) {
+            isSearching = true
+            val results = viewModel.searchUsers(searchQuery)
+            searchResults = results.map { friend ->
+                RivalItem(
+                    username = friend.name,
+                    avatar = friend.avatar,
+                    streak = friend.streak,
+                    rank = "",
+                    mutualCount = 0
+                )
+            }
+            isSearching = false
+        } else {
+            searchResults = emptyList()
+        }
     }
 
-    val filteredRivals = remember(searchQuery) {
-        suggestedRivals.filter {
-            it.username.contains(searchQuery, ignoreCase = true)
-        }
+    val filteredRivals = remember(searchQuery, searchResults) {
+        if (searchQuery.length >= 2) searchResults else emptyList()
     }
 
     Column(
@@ -222,16 +236,38 @@ fun FindRivalsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(filteredRivals) { rival ->
-                RivalRow(
-                    rival = rival,
-                    onAddClick = { onRivalSelected(rival.username) },
-                    interFamily = interFamily
-                )
+        if (filteredRivals.isEmpty() && searchQuery.length < 2) {
+            // No search yet — show empty state
+            EmptyState(
+                emoji = "🔍",
+                title = "Find your rivals",
+                subtitle = "Search for friends by username to challenge them to Duo or Group alarms.",
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (filteredRivals.isEmpty() && searchQuery.length >= 2) {
+            // Search returned nothing
+            EmptyState(
+                emoji = "🤷",
+                title = "No users found",
+                subtitle = "No username matches \"$searchQuery\". Try a different search.",
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(filteredRivals) { rival ->
+                    RivalRow(
+                        rival = rival,
+                        onAddClick = { onRivalSelected(rival.username) },
+                        interFamily = interFamily
+                    )
+                }
             }
         }
     }

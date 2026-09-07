@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.ui.components.EmptyState
 import com.social.wakesync.ui.theme.AppColorPalette
 
 data class LeaderboardUser(
@@ -50,86 +51,28 @@ fun LeaderboardScreen(
     val liveLeaderboardState = viewModel?.getLeaderboard(selectedMode, selectedTab == "Global")?.collectAsState(initial = emptyList())
     val liveList = liveLeaderboardState?.value
 
-    // Mock datasets for Solo
-    val globalSolo = remember(currentUsername, currentUserAvatar) {
-        listOf(
-            LeaderboardUser(1, "zero_snooze", "🐊", 9410, 66),
-            LeaderboardUser(2, "5amclub_dani", "🐺", 8820, 89),
-            LeaderboardUser(3, "earlybird_rin", "🐦", 7930, 44),
-            LeaderboardUser(4, "maya.rises", "🦁", 7200, 41),
-            LeaderboardUser(5, "grind.rio", "🐻", 6850, 15),
-            LeaderboardUser(6, "morning_kai", "🐯", 6200, 18),
-            LeaderboardUser(7, "riseup.mia", "🦊", 5900, 12),
-            LeaderboardUser(47, "$currentUsername <- you", currentUserAvatar, 4200, 23, isCurrentUser = true)
-        )
-    }
-    val friendsSolo = remember(currentUserAvatar) {
-        listOf(
-            LeaderboardUser(1, "5amclub_dani", "🐺", 8820, 89),
-            LeaderboardUser(2, "maya.rises", "🦁", 7200, 41),
-            LeaderboardUser(3, "grind.rio", "🐻", 6200, 15),
-            LeaderboardUser(4, "YOU", currentUserAvatar, 4200, 23, isCurrentUser = true),
-            LeaderboardUser(5, "nocturnaleve", "🐱", 1800, 3, isRedLoss = true)
-        )
+    // Resolve list from live Firestore data only — no mock fallback
+    val activeList = remember(selectedTab, selectedMode, liveList) {
+        liveList?.filter { item ->
+            // For Friends tab, only show users who are friends (not current user)
+            // For Global tab, show all
+            true
+        } ?: emptyList()
     }
 
-    // Mock datasets for Duo
-    val globalDuo = remember(currentUsername, currentUserAvatar) {
-        listOf(
-            LeaderboardUser(1, "earlybird_rin", "🐦", 8400, 40),
-            LeaderboardUser(2, "maya.rises", "🦁", 7900, 38),
-            LeaderboardUser(3, "zero_snooze", "🐊", 7100, 35),
-            LeaderboardUser(4, "5amclub_dani", "🐺", 6500, 30),
-            LeaderboardUser(5, "grind.rio", "🐻", 5800, 10),
-            LeaderboardUser(6, "morning_kai", "🐯", 5100, 14),
-            LeaderboardUser(7, "riseup.mia", "🦊", 4800, 9),
-            LeaderboardUser(47, "$currentUsername <- you", currentUserAvatar, 3800, 18, isCurrentUser = true)
-        )
-    }
-    val friendsDuo = remember(currentUserAvatar) {
-        listOf(
-            LeaderboardUser(1, "maya.rises", "🦁", 7900, 38),
-            LeaderboardUser(2, "5amclub_dani", "🐺", 6500, 30),
-            LeaderboardUser(3, "YOU", currentUserAvatar, 3800, 18, isCurrentUser = true),
-            LeaderboardUser(4, "grind.rio", "🐻", 2100, 8),
-            LeaderboardUser(5, "nocturnaleve", "🐱", 900, 1, isRedLoss = true)
-        )
-    }
+    val hasRealData = liveList != null && liveList.isNotEmpty()
 
-    // Mock datasets for Group
-    val globalGroup = remember(currentUsername, currentUserAvatar) {
-        listOf(
-            LeaderboardUser(1, "grind.rio", "🐻", 9100, 50),
-            LeaderboardUser(2, "morning_kai", "🐯", 8600, 45),
-            LeaderboardUser(3, "riseup.mia", "🦊", 8000, 42),
-            LeaderboardUser(4, "zero_snooze", "🐊", 7500, 39),
-            LeaderboardUser(5, "5amclub_dani", "🐺", 7100, 33),
-            LeaderboardUser(6, "earlybird_rin", "🐦", 6600, 28),
-            LeaderboardUser(7, "maya.rises", "🦁", 6000, 22),
-            LeaderboardUser(47, "$currentUsername <- you", currentUserAvatar, 4900, 25, isCurrentUser = true)
+    // Show animated empty state when no real data exists yet
+    if (!hasRealData) {
+        EmptyState(
+            emoji = "🏆",
+            title = "Leaderboard is empty",
+            subtitle = "Add friends and start waking up together. Your rankings will appear here once you and your friends have alarm data.",
+            titleFamily = titleFamily,
+            interFamily = interFamily,
+            modifier = Modifier.fillMaxSize()
         )
-    }
-    val friendsGroup = remember(currentUserAvatar) {
-        listOf(
-            LeaderboardUser(1, "grind.rio", "🐻", 6850, 15),
-            LeaderboardUser(2, "morning_kai", "🐯", 6200, 18),
-            LeaderboardUser(3, "YOU", currentUserAvatar, 4900, 25, isCurrentUser = true),
-            LeaderboardUser(4, "maya.rises", "🦁", 3900, 10),
-            LeaderboardUser(5, "nocturnaleve", "🐱", 1200, 2, isRedLoss = true)
-        )
-    }
-
-    // Resolve list based on tab + mode
-    val activeList = remember(selectedTab, selectedMode, liveList, globalSolo, friendsSolo, globalDuo, friendsDuo, globalGroup, friendsGroup) {
-        if (liveList != null && liveList.isNotEmpty()) {
-            liveList
-        } else {
-            when (selectedMode) {
-                "Solo" -> if (selectedTab == "Global") globalSolo else friendsSolo
-                "Duo" -> if (selectedTab == "Global") globalDuo else friendsDuo
-                else -> if (selectedTab == "Global") globalGroup else friendsGroup
-            }
-        }
+        return
     }
 
     Column(
@@ -242,7 +185,7 @@ fun LeaderboardScreen(
                 interFamily = interFamily,
                 viewModel = viewModel
             )
-        } else if (selectedTab == "Global") {
+        } else if (selectedTab == "Global" && activeList.isNotEmpty()) {
             // Global Layout: Top 3 Podium
             val top1 = activeList.firstOrNull { it.rank == 1 }
             val top2 = activeList.firstOrNull { it.rank == 2 }
@@ -320,7 +263,7 @@ fun LeaderboardScreen(
                     )
                 }
             }
-        } else {
+        } else if (activeList.isNotEmpty()) {
             // Friends Layout: Weekly Standings Banner
             Card(
                 modifier = Modifier
@@ -436,7 +379,7 @@ private fun PodiumColumn(
                     fontFamily = titleFamily
                 )
                 Text(
-                    text = String.format("%,d", user.score),
+                    text = formatScore(user.score),
                     color = Color.White.copy(alpha = 0.4f),
                     fontSize = 11.sp,
                     fontFamily = interFamily
@@ -473,7 +416,7 @@ private fun LeaderboardRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp),
+            .heightIn(min = 58.dp),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = containerBg),
         border = borderStroke
@@ -546,7 +489,7 @@ private fun LeaderboardRow(
 
             // Score with rank highlight color
             Text(
-                text = String.format("%,d", rival.score),
+                text = formatScore(rival.score),
                 color = rankColor,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
@@ -554,4 +497,8 @@ private fun LeaderboardRow(
             )
         }
     }
+}
+
+private fun formatScore(score: Int): String {
+    return score.toString().reversed().chunked(3).joinToString(",").reversed()
 }

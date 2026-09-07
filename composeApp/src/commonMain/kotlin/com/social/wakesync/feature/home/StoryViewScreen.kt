@@ -236,25 +236,65 @@ fun StoryViewScreen(
                 }
             }
 
-            // 3. Center Screen Area (Mockup Trophy with Placeholder "story content")
+            // 3. Center Screen Area (Renders story badge sticker and custom text overlay)
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val badgeColor = remember(story.badgeColorHex) {
+                    try {
+                        val cleanedHex = story.badgeColorHex.removePrefix("#")
+                        Color(cleanedHex.toLong(16) or 0xFF000000)
+                    } catch (e: Exception) {
+                        Color(0xFF00FF94)
+                    }
+                }
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    Text(text = "🏆", fontSize = 48.sp)
-                    Text(
-                        text = "story content",
-                        color = Color.White.copy(alpha = 0.15f),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = interFamily
-                    )
+                    if (story.badgeText.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(badgeColor.copy(alpha = 0.15f))
+                                .border(1.5.dp, badgeColor, RoundedCornerShape(16.dp))
+                                .padding(horizontal = 18.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = story.badgeText,
+                                color = badgeColor,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = interFamily
+                            )
+                        }
+                    } else {
+                        Text(text = "🏆", fontSize = 48.sp)
+                    }
+
+                    if (story.caption.isNotBlank()) {
+                        Text(
+                            text = story.caption,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = interFamily,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "5 AM Grind Complete! 💪",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = interFamily
+                        )
+                    }
                 }
             }
 

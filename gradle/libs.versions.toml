@@ -19,6 +19,7 @@ androidx-credentials = "1.6.0"
 googleid = "1.2.0"
 firebase-auth = "23.2.0"
 firebase-firestore = "25.1.1"
+firebase-messaging = "24.1.0"
 play-services-auth = "21.5.1"
 kamel = "1.0.0"
 ktor = "3.0.1"
@@ -46,6 +47,7 @@ compose-components-resources = { module = "org.jetbrains.compose.components:comp
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
 firebase-auth = { module = "com.google.firebase:firebase-auth", version.ref = "firebase-auth" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore-ktx", version.ref = "firebase-firestore" }
+firebase-messaging = { module = "com.google.firebase:firebase-messaging", version.ref = "firebase-messaging" }
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidx-credentials" }
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }

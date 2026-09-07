@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,7 +21,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.ui.components.EmptyState
 import com.social.wakesync.ui.theme.AppColorPalette
+import kotlinx.coroutines.launch
 
 // Data class for user profile details
 data class ProfileDetails(
@@ -47,62 +49,23 @@ fun UserProfileScreen(
     interFamily: FontFamily,
     modifier: Modifier = Modifier
 ) {
-    // Generate data-driven profile details based on the username
-    val details = remember(username) {
-        when (username) {
-            "5amclub_dani" -> ProfileDetails(
-                username = "5amclub_dani",
-                avatar = "🐺",
-                joinedDate = "Joined Mar 2025",
-                streak = 89,
-                winLossText = "74-12",
-                rankText = "#3",
-                rankBadgeText = "Top 5",
-                headToHeadFriend = 12,
-                headToHeadYou = 5,
-                badgePills = listOf("🐺 Apex" to "Pack Leader", "🌅 Early Bird" to "5:00 AM", "🔥 On Fire" to "Streak", "⚡ Speedster" to "Fast Dismiss"),
-                themeColor = Color(0xFFFFD23D)
-            )
-            "nocturnaleve" -> ProfileDetails(
-                username = "nocturnaleve",
-                avatar = "🐱",
-                joinedDate = "Joined Jun 2025",
+    // Start with a placeholder profile — will be populated from Firestore when available
+    var details by remember {
+        mutableStateOf(
+            ProfileDetails(
+                username = username,
+                avatar = "👤",
+                joinedDate = "",
                 streak = 0,
-                winLossText = "14-38",
-                rankText = "#42",
-                rankBadgeText = "Tier 3",
-                headToHeadFriend = 2,
-                headToHeadYou = 9,
-                badgePills = listOf("🐱 Night Owl" to "Late Sleep", "💀 Slacker" to "Slept In"),
-                themeColor = Color(0xFFFF3D71)
-            )
-            "grind.rio" -> ProfileDetails(
-                username = "grind.rio",
-                avatar = "🐻",
-                joinedDate = "Joined Dec 2024",
-                streak = 15,
-                winLossText = "33-19",
-                rankText = "#18",
-                rankBadgeText = "Top 20",
-                headToHeadFriend = 4,
-                headToHeadYou = 4,
-                badgePills = listOf("🐻 Beast" to "Grind Mode", "🌅 Early Bird" to "Early Rise", "💪 Tank" to "Never Fail"),
+                winLossText = "0-0",
+                rankText = "",
+                rankBadgeText = "New",
+                headToHeadFriend = 0,
+                headToHeadYou = 0,
+                badgePills = emptyList(),
                 themeColor = Color(0xFF00E0FF)
             )
-            else -> ProfileDetails(
-                username = "maya.rises",
-                avatar = "🦁",
-                joinedDate = "Joined Jan 2025",
-                streak = 41,
-                winLossText = "52-8",
-                rankText = "#7",
-                rankBadgeText = "Top 10",
-                headToHeadFriend = 7,
-                headToHeadYou = 3,
-                badgePills = listOf("🦁 Apex" to "Apex Predator", "🌅 Early Bird" to "Sunrise Club", "🔥 On Fire" to "Super Hot", "⚡ Speedster" to "Quick Solves"),
-                themeColor = Color(0xFFFFD23D)
-            )
-        }
+        )
     }
 
     Box(
@@ -135,7 +98,7 @@ fun UserProfileScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = "Back",
                         tint = Color.White,
                         modifier = Modifier.size(18.dp)

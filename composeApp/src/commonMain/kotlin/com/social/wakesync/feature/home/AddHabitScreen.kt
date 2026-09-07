@@ -42,14 +42,61 @@ fun AddHabitScreen(
     var reminderTime by remember { mutableStateOf(habit?.reminderTime ?: "6:15 AM") }
     var isAccountabilityEnabled by remember { mutableStateOf(habit?.partnerUsername?.isNotBlank() == true) }
     var selectedPartnerUsername by remember { mutableStateOf<String?>(habit?.partnerUsername) }
-    var bondName by remember { mutableStateOf(habit?.bondName ?: "") }
-    
-    // Set default partner if list is not empty
+    var pendingPartnerConfirmation by remember { mutableStateOf<String?>(null) }
+    var bondName by remember { mutableStateOf(habit?.bondName ?: "") }    // Set default partner if list is not empty
     LaunchedEffect(friends) {
         if (selectedPartnerUsername == null && friends.isNotEmpty()) {
             selectedPartnerUsername = friends.firstOrNull()?.name
         }
     }
+
+    // Confirmation dialog before adding accountability partner
+    pendingPartnerConfirmation?.let { username ->
+        AlertDialog(
+            onDismissRequest = { pendingPartnerConfirmation = null },
+            title = {
+                Text(
+                    text = "Add Accountability Partner?",
+                    fontFamily = titleFamily,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "You're about to add @$username as your accountability partner for this habit. " +
+                        "They'll be able to see your progress and hold you accountable. Continue?",
+                    fontFamily = interFamily,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedPartnerUsername = username
+                    pendingPartnerConfirmation = null
+                }) {
+                    Text(
+                        text = "Add Partner",
+                        color = AppColorPalette.CyanCta,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingPartnerConfirmation = null }) {
+                    Text(
+                        text = "Cancel",
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+            },
+            containerColor = AppColorPalette.Surface,
+            titleContentColor = Color.White,
+            textContentColor = Color.White.copy(alpha = 0.7f)
+        )
+    }
+
+
+
 
     val emoji = when (selectedIcon) {
         HabitIconType.RUN -> "🏃"
@@ -340,7 +387,7 @@ fun AddHabitScreen(
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(if (isSelected) AppColorPalette.CyanCta.copy(alpha = 0.08f) else AppColorPalette.Surface)
                                             .border(1.5.dp, pillBorderColor, RoundedCornerShape(12.dp))
-                                            .clickable { selectedPartnerUsername = friend.name }
+                                            .clickable { pendingPartnerConfirmation = friend.name }
                                             .padding(horizontal = 12.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)

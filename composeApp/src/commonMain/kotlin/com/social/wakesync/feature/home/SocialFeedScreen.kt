@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -33,22 +34,77 @@ fun SocialFeedScreen(
     interFamily: FontFamily,
     onStoryClick: (StoryItem) -> Unit,
     onUserClick: (String) -> Unit,
+    onCreateStoryClick: () -> Unit = {},
+    feedPosts: List<FeedPost> = emptyList(),
+    userStories: List<StoryItem> = emptyList(),
     modifier: Modifier = Modifier
 ) {
-    // Stories mock data matching screenshot
-    val stories = remember {
-        listOf(
-            StoryItem("1", "Your story", "+", Color.White.copy(alpha = 0.15f), isUser = true),
-            StoryItem("2", "maya.rises", "🦁", Color(0xFF00FF94)),
-            StoryItem("3", "5amclub_dani", "🐺", Color(0xFFFFD23D)),
-            StoryItem("4", "grind.rio", "🐻", Color(0xFF00FF94)),
-            StoryItem("5", "nocturnaleve", "🐱", Color(0xFFFF3D71))
-        )
+    val activeUserStory = remember(userStories) {
+        userStories.firstOrNull { it.isUser || it.hasActiveStory }
     }
 
-    // Interactive feed items matching screenshot exactly
-    var feedItems by remember {
-        mutableStateOf(
+    val stories = remember(activeUserStory, userStories) {
+        val list = mutableListOf<StoryItem>()
+        if (activeUserStory != null) {
+            list.add(
+                activeUserStory.copy(
+                    id = activeUserStory.id.ifEmpty { "1" },
+                    username = "Your story",
+                    avatar = activeUserStory.avatar.ifEmpty { "👤" },
+                    isUser = true,
+                    hasActiveStory = true
+                )
+            )
+        } else {
+            list.add(
+                StoryItem("1", "Your story", "+", Color.White.copy(alpha = 0.15f), isUser = true, hasActiveStory = false)
+            )
+        }
+        
+        // Add other stories if available, otherwise fall back to mock stories
+        val otherStories = userStories.filter { !it.isUser && !it.hasActiveStory }
+        if (otherStories.isNotEmpty()) {
+            list.addAll(otherStories)
+        } else {
+            list.addAll(
+                listOf(
+                    StoryItem("2", "maya.rises", "🦁", Color(0xFF00FF94), caption = "5 AM Grind Complete! 💪", badgeText = "🏆 New Record", badgeColorHex = "#00FF94", gradientStartHex = "#002B1D", gradientEndHex = "#005C3E"),
+                    StoryItem("3", "5amclub_dani", "🐺", Color(0xFFFFD23D), caption = "14-Day Streak Unlocked 🔥", badgeText = "⚡ 14-Day Streak", badgeColorHex = "#FFD23D", gradientStartHex = "#2D0B00", gradientEndHex = "#6A1B00"),
+                    StoryItem("4", "grind.rio", "🐻", Color(0xFF00FF94), caption = "Orb Focus Mastered 🌟", badgeText = "🌅 5:00 AM Wake Up", badgeColorHex = "#00E5FF", gradientStartHex = "#050811", gradientEndHex = "#1A102F"),
+                    StoryItem("5", "nocturnaleve", "🐱", Color(0xFFFF3D71), caption = "Failed alarm punishment incoming 😅", badgeText = "📖 Fail Story", badgeColorHex = "#FF3D71", gradientStartHex = "#210B3B", gradientEndHex = "#4A154B")
+                )
+            )
+        }
+        list
+    }
+
+    // Map real FeedPost data to UI FeedItems, fall back to mock if empty
+    val mappedFeedItems = remember(feedPosts) {
+        if (feedPosts.isNotEmpty()) {
+            feedPosts.map { post ->
+                val badgeColor = try {
+                    val hex = post.badgeColorHex.removePrefix("#")
+                    val r = hex.substring(0, 2).toInt(16) / 255f
+                    val g = hex.substring(2, 4).toInt(16) / 255f
+                    val b = hex.substring(4, 6).toInt(16) / 255f
+                    Color(r, g, b)
+                } catch (_: Exception) { Color(0xFF22C55E) }
+                val timeAgo = formatTimeAgo(post.createdAt)
+                FeedItem(
+                    id = post.id,
+                    username = post.username,
+                    avatar = post.avatar,
+                    timeAgo = timeAgo,
+                    streak = post.streak,
+                    badgeText = post.badgeText,
+                    badgeColor = badgeColor,
+                    content = post.content,
+                    reactions = post.reactions.map { it.key to it.value },
+                    avatarBorderColor = badgeColor
+                )
+            }
+        } else {
+            // Fallback mock data when no real posts exist yet
             listOf(
                 FeedItem(
                     id = "1",
@@ -99,13 +155,16 @@ fun SocialFeedScreen(
                     avatarBorderColor = Color(0xFF00E0FF)
                 )
             )
-        )
+        }
     }
+
+    var feedItems by remember(mappedFeedItems) { mutableStateOf(mappedFeedItems) }
 
     var replyingToItem by remember { mutableStateOf<FeedItem?>(null) }
     var replyText by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
     var notificationsActive by remember { mutableStateOf(false) }
+    var reactedEmojis by remember { mutableStateOf(setOf<String>()) }
 
     Box(
         modifier = modifier
@@ -190,7 +249,11 @@ fun SocialFeedScreen(
                                 interFamily = interFamily,
                                 onClick = {
                                     if (story.isUser) {
-                                        // User story upload mock
+                                        if (story.hasActiveStory) {
+                                            onStoryClick(story)
+                                        } else {
+                                            onCreateStoryClick()
+                                        }
                                     } else {
                                         onStoryClick(story)
                                     }
@@ -208,14 +271,18 @@ fun SocialFeedScreen(
                         interFamily = interFamily,
                         onReplyClick = { replyingToItem = item },
                         onReactionClick = { emoji ->
-                            feedItems = feedItems.map { fit ->
-                                if (fit.id == item.id) {
-                                    fit.copy(
-                                        reactions = fit.reactions.map { (e, c) ->
-                                            if (e == emoji) e to (c + 1) else e to c
-                                        }
-                                    )
-                                } else fit
+                            val reactionKey = "${item.id}_$emoji"
+                            if (reactionKey !in reactedEmojis) {
+                                reactedEmojis = reactedEmojis + reactionKey
+                                feedItems = feedItems.map { fit ->
+                                    if (fit.id == item.id) {
+                                        fit.copy(
+                                            reactions = fit.reactions.map { (e, c) ->
+                                                if (e == emoji) e to (c + 1) else e to c
+                                            }
+                                        )
+                                    } else fit
+                                }
                             }
                         },
                         onUserClick = onUserClick
@@ -322,7 +389,7 @@ fun StoryCircle(
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                if (story.isUser) {
+                if (story.isUser && !story.hasActiveStory) {
                     drawCircle(
                         color = story.borderColor,
                         style = Stroke(
@@ -331,6 +398,18 @@ fun StoryCircle(
                                 floatArrayOf(8f, 8f), 0f
                             )
                         )
+                    )
+                } else if (story.hasActiveStory) {
+                    drawCircle(
+                        brush = Brush.sweepGradient(
+                            listOf(
+                                Color(0xFF833AB4),
+                                Color(0xFFFD1D1D),
+                                Color(0xFFFFD23D),
+                                Color(0xFF833AB4)
+                            )
+                        ),
+                        style = Stroke(width = 2.dp.toPx())
                     )
                 } else {
                     drawCircle(
@@ -697,8 +776,16 @@ data class StoryItem(
     val id: String,
     val username: String,
     val avatar: String,
-    val borderColor: Color,
-    val isUser: Boolean = false
+    val borderColor: Color = Color(0xFF00FF94),
+    val isUser: Boolean = false,
+    val userId: String = "",
+    val caption: String = "",
+    val badgeText: String = "",
+    val badgeColorHex: String = "#00FF94",
+    val gradientStartHex: String = "#050811",
+    val gradientEndHex: String = "#1A102F",
+    val timestamp: Long = 0L,
+    val hasActiveStory: Boolean = false
 )
 
 data class FeedItem(
@@ -713,3 +800,19 @@ data class FeedItem(
     val reactions: List<Pair<String, Int>>,
     val avatarBorderColor: Color
 )
+
+private fun formatTimeAgo(timestamp: Long): String {
+    if (timestamp == 0L) return ""
+    val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    val diff = now - timestamp
+    val minutes = diff / (60 * 1000)
+    val hours = diff / (60 * 60 * 1000)
+    val days = diff / (24 * 60 * 60 * 1000)
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        days < 7 -> "${days}d ago"
+        else -> "${days / 7}w ago"
+    }
+}

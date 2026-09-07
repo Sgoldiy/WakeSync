@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.social.wakesync.ui.theme.AppColorPalette
+import com.social.wakesync.ui.utils.BackHandler
 
 data class PremiumFeatureItem(
     val icon: String,
@@ -39,16 +40,15 @@ fun PremiumScreen(
     interFamily: FontFamily,
     modifier: Modifier = Modifier,
     onUpgradeClick: (isYearly: Boolean) -> Unit = {},
-    features: List<PremiumFeatureItem> = remember {
-        listOf(
-            PremiumFeatureItem("📊", "Advanced Stats", "Detailed wake analytics"),
-            PremiumFeatureItem("🎨", "Custom Themes", "Exclusive dark palettes"),
-            PremiumFeatureItem("⚡", "Priority in Duo", "Choose your challenge"),
-            PremiumFeatureItem("🤫", "Ghost Mode", "Hide your losses from feed"),
-            PremiumFeatureItem("🏷️", "Premium Badge", "Gold ring on your avatar")
-        )
-    }
+    features: List<PremiumFeatureItem> = listOf(
+        PremiumFeatureItem("📊", "Advanced Stats", "Detailed wake analytics"),
+        PremiumFeatureItem("🎨", "Custom Themes", "Exclusive dark palettes"),
+        PremiumFeatureItem("⚡", "Priority in Duo", "Choose your challenge"),
+        PremiumFeatureItem("🤫", "Ghost Mode", "Hide your losses from feed"),
+        PremiumFeatureItem("🏷️", "Premium Badge", "Gold ring on your avatar")
+    )
 ) {
+    BackHandler { onClose() }
     var isYearlySelected by remember { mutableStateOf(true) }
 
     Column(

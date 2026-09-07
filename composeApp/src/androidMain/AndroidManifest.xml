@@ -30,7 +30,8 @@
         tools:ignore="FullScreenIntentPolicy" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -65,6 +66,15 @@
             android:name=".feature.home.AlarmService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Firebase Cloud Messaging service for push notifications -->
+        <service
+            android:name=".feature.home.WakeSyncMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

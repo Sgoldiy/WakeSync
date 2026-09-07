@@ -61,9 +61,10 @@ kotlin {
             implementation(libs.googleid)
             implementation(libs.play.services.auth)
 
-            // Firebase (Firestore and Auth)
+            // Firebase (Firestore, Auth, and Cloud Messaging)
             implementation(libs.firebase.auth)
             implementation(libs.firebase.firestore)
+            implementation(libs.firebase.messaging)
             implementation(libs.ktor.client.okhttp)
         }
 
@@ -92,7 +93,12 @@ android {
     }
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {

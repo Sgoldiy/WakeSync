@@ -1,7 +1,9 @@
 package com.social.wakesync.feature.home
 
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -89,13 +92,21 @@ fun AlarmLockScreen(
                 "SATURDAY" -> "Saturday"
                 else -> "Sunday"
             }
-            val monthName = when (now.monthNumber) {
-                1 -> "January"; 2 -> "February"; 3 -> "March"; 4 -> "April"
-                5 -> "May"; 6 -> "June"; 7 -> "July"; 8 -> "August"
-                9 -> "September"; 10 -> "October"; 11 -> "November"
-                else -> "December"
+            val monthName = when (now.month) {
+                kotlinx.datetime.Month.JANUARY -> "January"
+                kotlinx.datetime.Month.FEBRUARY -> "February"
+                kotlinx.datetime.Month.MARCH -> "March"
+                kotlinx.datetime.Month.APRIL -> "April"
+                kotlinx.datetime.Month.MAY -> "May"
+                kotlinx.datetime.Month.JUNE -> "June"
+                kotlinx.datetime.Month.JULY -> "July"
+                kotlinx.datetime.Month.AUGUST -> "August"
+                kotlinx.datetime.Month.SEPTEMBER -> "September"
+                kotlinx.datetime.Month.OCTOBER -> "October"
+                kotlinx.datetime.Month.NOVEMBER -> "November"
+                kotlinx.datetime.Month.DECEMBER -> "December"
             }
-            dateString = "$dayName, $monthName ${now.dayOfMonth}"
+            dateString = "$dayName, $monthName ${now.day}"
             delay(1000)
         }
     }
@@ -355,25 +366,27 @@ fun AlarmLockScreen(
                         ) {
                             groupAvatars.forEachIndexed { index, avatar ->
                                 val borderColor = avatarBorderColors[index % avatarBorderColors.size]
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .background(AppColorPalette.DeepSurface)
-                                        .border(2.dp, borderColor, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(text = avatar, fontSize = 20.sp)
+                                Box(modifier = Modifier.size(44.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(AppColorPalette.DeepSurface)
+                                            .border(2.dp, borderColor, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = avatar, fontSize = 20.sp)
+                                    }
+                                    // Small colored status dot below each avatar
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .size(8.dp)
+                                            .offset(y = 2.dp)
+                                            .clip(CircleShape)
+                                            .background(borderColor)
+                                    )
                                 }
-                                // Small colored status dot below each avatar
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(borderColor)
-                                        .align(Alignment.BottomCenter)
-                                        .offset(y = 44.dp)
-                                )
                             }
                         }
                     }

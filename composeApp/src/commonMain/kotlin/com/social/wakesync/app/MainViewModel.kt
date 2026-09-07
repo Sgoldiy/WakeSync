@@ -77,8 +77,12 @@ class MainViewModel : ViewModel() {
         checkAuthState(true, isPermissionsGranted)
     }
     
-    fun onProfileCreated() {
-        _uiState.value = MainUiState.Permissions
+    fun onProfileCreated(isPermissionsGranted: Boolean = false) {
+        if (isPermissionsGranted) {
+            _uiState.value = MainUiState.Home
+        } else {
+            _uiState.value = MainUiState.Permissions
+        }
     }
     
     fun onPermissionsGranted() {

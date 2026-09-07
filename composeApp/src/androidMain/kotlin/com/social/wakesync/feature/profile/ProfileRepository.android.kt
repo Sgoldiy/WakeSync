@@ -37,6 +37,7 @@ class AndroidProfileRepository : ProfileRepository {
                             "authDisplayName" to (user.displayName ?: ""),
                             "username" to username,
                             "avatar" to avatar,
+                            "avatarEmoji" to avatar,
                             "goal" to goal,
                             "streak" to 0,
                             "wins" to 0,
@@ -145,6 +146,7 @@ class AndroidProfileRepository : ProfileRepository {
                 }
                 
                 transaction.update(userDoc, "avatar", emoji)
+                transaction.update(userDoc, "avatarEmoji", emoji)
                 transaction.update(userDoc, "lastAvatarUpdate", com.google.firebase.Timestamp.now())
             }.addOnSuccessListener {
                 if (continuation.isActive) continuation.resume(Result.success(Unit))

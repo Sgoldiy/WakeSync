@@ -33,12 +33,14 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -69,7 +71,33 @@ fun AlarmsScreen(
     BackHandler { onBack() }
 
     var showSetAlarmScreen by remember { mutableStateOf(false) }
+    var alarmToDelete by remember { mutableStateOf<String?>(null) }
     val uiState by viewModel.uiState.collectAsState()
+
+    // Delete confirmation dialog
+    if (alarmToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { alarmToDelete = null },
+            title = { Text("Delete Alarm?", fontFamily = titleFamily, fontWeight = FontWeight.Bold) },
+            text = { Text("This alarm will be permanently removed. This action cannot be undone.", fontFamily = interFamily) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteAlarm(alarmToDelete!!)
+                    alarmToDelete = null
+                }) {
+                    Text("Delete", color = AppColorPalette.LossRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { alarmToDelete = null }) {
+                    Text("Cancel", color = AppColorPalette.CyanCta)
+                }
+            },
+            containerColor = AppColorPalette.Surface,
+            titleContentColor = Color.White,
+            textContentColor = Color.White.copy(alpha = 0.7f)
+        )
+    }
 
     if (showSetAlarmScreen) {
         SetAlarmScreen(
@@ -240,7 +268,7 @@ fun AlarmsScreen(
                                     viewModel.toggleAlarm(alarm.id, isEnabled)
                                 },
                                 onDelete = {
-                                    viewModel.deleteAlarm(alarm.id)
+                                    alarmToDelete = alarm.id
                                 },
                                 titleFamily = titleFamily,
                                 interFamily = interFamily

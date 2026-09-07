@@ -11,11 +11,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.ui.components.EmptyState
 import com.social.wakesync.ui.theme.AppColorPalette
 
 enum class NotificationCategory(val headerTitle: String) {
@@ -47,30 +49,48 @@ fun NotificationsScreen(
     titleFamily: FontFamily,
     interFamily: FontFamily,
     onBack: (() -> Unit)? = null,
+    viewModel: HomeViewModel? = null,
     modifier: Modifier = Modifier
 ) {
-    var notifications by remember {
-        mutableStateOf(
-            listOf(
-                // Alarms
-                NotificationItem("1", NotificationCategory.ALARMS, "🔥", "Your 6:30 AM alarm fires in 9 hours", "Make sure your phone stays on", "now", isUnread = true),
-                NotificationItem("2", NotificationCategory.ALARMS, "⚡", "Group alarm tomorrow: Morning Crew", "5 members confirmed", "5m", isUnread = true),
-                
-                // Social
-                NotificationItem("3", NotificationCategory.SOCIAL, "🦁", "maya.rises challenged you to a Duo", "Accept before midnight", "12m", isUnread = true),
-                NotificationItem("4", NotificationCategory.SOCIAL, "🐺", "5amclub_dani hit a 90-day streak", "They're leaving everyone behind", "1h", isUnread = false),
-                
-                // Achievements
-                NotificationItem("5", NotificationCategory.ACHIEVEMENTS, "⚡", "You earned: Speedster badge", "0:38 completion — fastest this week", "3h", isUnread = false),
-                
-                // Groups
-                NotificationItem("6", NotificationCategory.GROUPS, "💀", "Kick vote started: nocturnaleve", "Morning Crew · 3/4 votes needed", "30m", isUnread = true),
-                NotificationItem("7", NotificationCategory.GROUPS, "🌅", "Morning Crew resets in 12 days", "Current leader: 5amclub_dani", "1d", isUnread = false)
-            )
-        )
+    // Get real-time notifications from Firestore via ViewModel
+    val realNotifications = if (viewModel != null) {
+        viewModel.getNotifications().collectAsState(initial = emptyList())
+    } else {
+        remember { mutableStateOf(emptyList<FeedNotification>()) }
     }
 
-    val categories = NotificationCategory.values()
+    // Map FeedNotification to NotificationItem, fall back to empty list
+    var notifications by remember(realNotifications.value) {
+        mutableStateOf(realNotifications.value.mapNotNull { fn ->
+            val category = when (fn.type) {
+                "punishment_assigned" -> NotificationCategory.SOCIAL
+                "alarm_missed" -> NotificationCategory.ALARMS
+                "streak_milestone" -> NotificationCategory.ACHIEVEMENTS
+                "group_invite", "group_kick" -> NotificationCategory.GROUPS
+                else -> NotificationCategory.SOCIAL
+            }
+            val timeAgo = formatNotificationTimeAgo(fn.createdAt)
+            NotificationItem(
+                id = fn.id,
+                category = category,
+                icon = when (fn.type) {
+                    "punishment_assigned" -> "💪"
+                    "alarm_missed" -> "⏰"
+                    "streak_milestone" -> "🔥"
+                    "group_invite" -> "👥"
+                    "group_kick" -> "💀"
+                    else -> "🔔"
+                },
+                title = fn.message,
+                subtext = "from @${fn.fromUsername}",
+                timeAgo = timeAgo,
+                isUnread = !fn.read
+            )
+        }
+    )
+    }
+
+    val categories = NotificationCategory.entries
 
     Column(
         modifier = modifier
@@ -100,7 +120,7 @@ fun NotificationsScreen(
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "Back",
                             tint = Color.White
                         )
@@ -145,6 +165,17 @@ fun NotificationsScreen(
             )
         }
 
+        // Empty state when no notifications
+        if (notifications.isEmpty()) {
+            EmptyState(
+                emoji = "🔔",
+                title = "No notifications yet",
+                subtitle = "When you or your friends wake up, miss alarms, or earn badges, you'll see notifications here.",
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
         // Grouped Notifications List
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -160,9 +191,6 @@ fun NotificationsScreen(
                             items = categoryItems,
                             interFamily = interFamily,
                             onItemClick = { clickedItem ->
-                                notifications = notifications.map {
-                                    if (it.id == clickedItem.id) it.copy(isUnread = false) else it
-                                }
                                 if (clickedItem.icon == "💀" || clickedItem.title.contains("Kick vote", ignoreCase = true)) {
                                     showKickVoteSheet = true
                                 }
@@ -172,6 +200,23 @@ fun NotificationsScreen(
                 }
             }
         }
+        } // end else (notifications not empty)
+    }
+}
+
+private fun formatNotificationTimeAgo(createdAt: Long): String {
+    if (createdAt <= 0L) return ""
+    val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    val diff = now - createdAt
+    val minutes = diff / 60000
+    val hours = minutes / 60
+    val days = hours / 24
+    return when {
+        minutes < 1 -> "now"
+        minutes < 60 -> "${minutes}m"
+        hours < 24 -> "${hours}h"
+        days < 7 -> "${days}d"
+        else -> "${days / 7}w"
     }
 }
 

@@ -143,6 +143,7 @@ class AlarmService : Service() {
         }
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        @Suppress("DEPRECATION")
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
             "WakeSync::AlarmWakeLock"
@@ -330,7 +331,7 @@ class AlarmService : Service() {
         val user = auth.currentUser ?: return
         val db = FirebaseFirestore.getInstance(FIRESTORE_DATABASE_ID)
         
-        CoroutineScope(Dispatchers.IO).launch {
+        serviceScope.launch(Dispatchers.IO) {
             try {
                 val docRef = db.collection("users")
                     .document(user.uid)
@@ -364,33 +365,7 @@ class AlarmService : Service() {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun calculateNextOccurrence(hour: Int, minute: Int, days: List<Int>): Long {
-        val zoneId = java.time.ZoneId.systemDefault()
-        val now = java.time.LocalDateTime.now(zoneId)
-        
-        val candidate = java.time.LocalDateTime.of(now.year, now.monthValue, now.dayOfMonth, hour, minute)
-        if (days.isEmpty()) {
-            return if (candidate.isAfter(now)) {
-                candidate.atZone(zoneId).toInstant().toEpochMilli()
-            } else {
-                candidate.plusDays(1).atZone(zoneId).toInstant().toEpochMilli()
-            }
-        }
-
-        val currentDayIdx = now.dayOfWeek.value - 1 // 0 (Mon) to 6 (Sun)
-        for (i in 0..7) {
-            val checkDayIdx = (currentDayIdx + i) % 7
-            if (days.contains(checkDayIdx)) {
-                val potential = candidate.plusDays(i.toLong())
-                if (potential.isAfter(now)) {
-                    return potential.atZone(zoneId).toInstant().toEpochMilli()
-                }
-            }
-        }
-        
-        return candidate.plusDays(1).atZone(zoneId).toInstant().toEpochMilli()
-    }
+    // calculateNextOccurrence is now in AlarmUtils.kt (shared with HomeViewModel)
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onDestroy() {

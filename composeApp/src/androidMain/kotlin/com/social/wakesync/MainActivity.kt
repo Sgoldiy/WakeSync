@@ -13,7 +13,7 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialException
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
@@ -57,14 +57,14 @@ class MainActivity : ComponentActivity() {
         com.social.wakesync.feature.home.initializeAlarmScheduler(this)
         com.social.wakesync.feature.home.initializeSoundDownloader(this)
         com.social.wakesync.feature.home.initSoundPlayer(this)
+        com.social.wakesync.feature.home.initNetworkMonitor(this)
+        com.social.wakesync.configureFirestoreOffline()
 
         val viewModel = com.social.wakesync.app.MainViewModel()
 
         setContent {
             val handler = getPermissionHandler()
-            val allPermissionsGranted = handler.isAlarmPermissionGranted() &&
-                    handler.isNotificationPermissionGranted() &&
-                    handler.isCameraPermissionGranted()
+            val allPermissionsGranted = handler.isAlarmPermissionGranted()
 
             App(
                 viewModel = viewModel,
@@ -86,13 +86,15 @@ class MainActivity : ComponentActivity() {
     private fun startGoogleSignIn(callback: (String?) -> Unit) {
         pendingAuthCallback = callback
 
-        val googleIdOption = GetSignInWithGoogleOption.Builder(
-            serverClientId = getString(R.string.default_web_client_id)
-        )
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setServerClientId(getString(R.string.default_web_client_id))
+            .setFilterByAuthorizedAccounts(false)
+            .setAutoSelectEnabled(false)
             .build()
 
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(googleIdOption)
+            .setPreferImmediatelyAvailableCredentials(false)
             .build()
 
         activityScope.launch {
@@ -103,8 +105,15 @@ class MainActivity : ComponentActivity() {
                 )
                 handleSignIn(result)
             } catch (e: GetCredentialException) {
-                Log.e("WakeSync", "Google sign-in failed", e)
-                callbackAndClear("Sign-in failed: ${e.message}")
+                Log.e("WakeSync", "Google sign-in error: ${e.type} - ${e.message}", e)
+                
+                // Specific handling for "Long live credential not available" which is an internal GMS failure
+                val userMessage = if (e.message?.contains("Long live credential", ignoreCase = true) == true) {
+                    "Please select a Google account to continue."
+                } else {
+                    e.message ?: "Sign-in failed"
+                }
+                callbackAndClear(userMessage)
             } catch (e: Exception) {
                 Log.e("WakeSync", "Unexpected Google sign-in error", e)
                 callbackAndClear("An unexpected error occurred: ${e.message}")

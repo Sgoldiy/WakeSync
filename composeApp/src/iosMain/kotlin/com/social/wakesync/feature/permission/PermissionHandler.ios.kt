@@ -12,6 +12,8 @@ import platform.UserNotifications.UNAuthorizationStatus
 import platform.UserNotifications.UNAuthorizationStatusAuthorized
 import platform.UserNotifications.UNAuthorizationStatusNotDetermined
 import platform.UserNotifications.UNUserNotificationCenter
+import platform.UIKit.UIApplication
+import platform.UIKit.UIBackgroundRefreshStatus
 import platform.darwin.DISPATCH_TIME_FOREVER
 import platform.darwin.dispatch_semaphore_create
 import platform.darwin.dispatch_semaphore_signal
@@ -22,7 +24,8 @@ class IosPermissionHandler : PermissionHandler {
     private var _notificationStatus: UNAuthorizationStatus = UNAuthorizationStatusNotDetermined
 
     override fun isAlarmPermissionGranted(): Boolean {
-        // Alarms on iOS are tied to Notification permissions
+        // Alarms on iOS require notification permissions
+        // Background app refresh is checked separately but not blocking
         return isNotificationPermissionGranted()
     }
 

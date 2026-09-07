@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.social.wakesync.ui.theme.AppColorPalette
+import com.social.wakesync.ui.utils.BackHandler
 
 @Composable
 fun SettingsScreen(
@@ -31,16 +32,21 @@ fun SettingsScreen(
     interFamily: FontFamily,
     modifier: Modifier = Modifier,
     currentUsername: String = "nocturnaljake",
+    notifPrefs: NotificationPreferences = NotificationPreferences(),
+    onNotifPrefsChanged: (NotificationPreferences) -> Unit = {},
     onBack: (() -> Unit)? = null,
     onSoundClick: (() -> Unit)? = null,
     onPremiumClick: (() -> Unit)? = null,
     onSignOutClick: (() -> Unit)? = null,
     onDeleteAccountClick: (() -> Unit)? = null
 ) {
-    var alarmAlertsEnabled by remember { mutableStateOf(true) }
-    var friendActivityEnabled by remember { mutableStateOf(true) }
-    var messagesEnabled by remember { mutableStateOf(true) }
-    var silentModeOverrideEnabled by remember { mutableStateOf(true) }
+    if (onBack != null) BackHandler { onBack() }
+    var alarmAlertsEnabled by remember { mutableStateOf(notifPrefs.alarmSoundsEnabled) }
+    var friendActivityEnabled by remember { mutableStateOf(notifPrefs.socialSoundsEnabled) }
+    var messagesEnabled by remember { mutableStateOf(notifPrefs.punishmentSoundsEnabled) }
+    var silentModeOverrideEnabled by remember { mutableStateOf(notifPrefs.vibrationEnabled) }
+    var quietHoursStart by remember { mutableStateOf(notifPrefs.quietHoursStart) }
+    var quietHoursEnd by remember { mutableStateOf(notifPrefs.quietHoursEnd) }
 
     Column(
         modifier = modifier
@@ -65,7 +71,7 @@ fun SettingsScreen(
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = "Back",
                         tint = Color.White
                     )
@@ -231,6 +237,80 @@ fun SettingsScreen(
                         subtext = "Always on",
                         isChecked = silentModeOverrideEnabled,
                         onCheckedChange = { silentModeOverrideEnabled = it },
+                        interFamily = interFamily
+                    )
+                }
+            }
+
+            // ── Section 3.5: NOTIFICATION SOUNDS ────────────────────────────
+            item {
+                SettingsSectionGroup(
+                    headerTitle = "PUSH NOTIFICATION SOUNDS",
+                    interFamily = interFamily
+                ) {
+                    SettingsSwitchRowItem(
+                        icon = "⏰",
+                        title = "Alarm result sounds",
+                        subtext = "Partner wake-up / miss alerts",
+                        isChecked = alarmAlertsEnabled,
+                        onCheckedChange = {
+                            alarmAlertsEnabled = it
+                            onNotifPrefsChanged(notifPrefs.copy(alarmSoundsEnabled = it))
+                        },
+                        interFamily = interFamily
+                    )
+
+                    HorizontalDivider(
+                        color = Color.White.copy(alpha = 0.05f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    SettingsSwitchRowItem(
+                        icon = "🏆",
+                        title = "Punishment sounds",
+                        subtext = "Punishment assignments & proofs",
+                        isChecked = messagesEnabled,
+                        onCheckedChange = {
+                            messagesEnabled = it
+                            onNotifPrefsChanged(notifPrefs.copy(punishmentSoundsEnabled = it))
+                        },
+                        interFamily = interFamily
+                    )
+
+                    HorizontalDivider(
+                        color = Color.White.copy(alpha = 0.05f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    SettingsSwitchRowItem(
+                        icon = "👋",
+                        title = "Social sounds",
+                        subtext = "Streaks, friends, and feed",
+                        isChecked = friendActivityEnabled,
+                        onCheckedChange = {
+                            friendActivityEnabled = it
+                            onNotifPrefsChanged(notifPrefs.copy(socialSoundsEnabled = it))
+                        },
+                        interFamily = interFamily
+                    )
+
+                    HorizontalDivider(
+                        color = Color.White.copy(alpha = 0.05f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    SettingsSwitchRowItem(
+                        icon = "📳",
+                        title = "Vibration",
+                        subtext = "Custom vibration per alert type",
+                        isChecked = silentModeOverrideEnabled,
+                        onCheckedChange = {
+                            silentModeOverrideEnabled = it
+                            onNotifPrefsChanged(notifPrefs.copy(vibrationEnabled = it))
+                        },
                         interFamily = interFamily
                     )
                 }

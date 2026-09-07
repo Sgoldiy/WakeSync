@@ -268,7 +268,29 @@ fun HabitDetailScreen(
                         letterSpacing = 1.sp
                     )
 
-                    // Contribution Graph Grid: 5 Rows x 7 Columns
+                    // Contribution Graph Grid: 5 Rows x 7 Columns (generated from real streak)
+                    val contributionCells = remember(habit.streak) {
+                        val totalCells = 35
+                        val activeCells = habit.streak.coerceAtMost(totalCells)
+                        // Generate pattern: most recent days are active, earlier days are sparse
+                        List(totalCells) { index ->
+                            val daysFromEnd = totalCells - 1 - index
+                            when {
+                                // Today (most recent) — bright cyan marker
+                                daysFromEnd == 0 -> 3 // CyanCta
+                                // Within current streak — bright green
+                                daysFromEnd < activeCells -> {
+                                    // Some variation: every ~5th day is lighter (rest day)
+                                    if (daysFromEnd % 7 == 6) 1 else 2
+                                }
+                                // Some earlier scattered activity
+                                daysFromEnd % 5 == 0 && daysFromEnd < totalCells - 3 -> 1
+                                // Empty/no-activity
+                                else -> 0
+                            }
+                        }
+                    }
+
                     Column(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -280,23 +302,12 @@ fun HabitDetailScreen(
                             ) {
                                 for (col in 0 until 7) {
                                     val cellIndex = row * 7 + col
-                                    
-                                    // Generate cells with varying completion opacity matching the mockup design
-                                    val cellColor = when {
-                                        // Empty/no-activity spots (grayish void)
-                                        cellIndex == 4 || cellIndex == 11 || cellIndex == 12 || cellIndex == 20 || cellIndex == 27 || cellIndex == 32 -> Color.White.copy(alpha = 0.05f)
-                                        
-                                        // Bright cyan/blue consistency marker
-                                        cellIndex == 34 -> AppColorPalette.CyanCta
-                                        
-                                        // Bright green active spots
-                                        cellIndex == 5 || cellIndex == 6 || cellIndex == 14 || cellIndex == 15 || cellIndex == 21 || cellIndex == 22 || cellIndex == 23 || cellIndex == 25 || cellIndex == 26 || cellIndex == 28 || cellIndex == 30 || cellIndex == 31 -> AppColorPalette.WinGreen
-                                        
-                                        // Mid green active spots
-                                        cellIndex == 1 || cellIndex == 7 || cellIndex == 8 || cellIndex == 13 || cellIndex == 17 || cellIndex == 18 || cellIndex == 19 || cellIndex == 29 -> AppColorPalette.WinGreen.copy(alpha = 0.6f)
-                                        
-                                        // Dark green low activity spots
-                                        else -> AppColorPalette.WinGreen.copy(alpha = 0.25f)
+                                    val cellLevel = if (cellIndex < contributionCells.size) contributionCells[cellIndex] else 0
+                                    val cellColor = when (cellLevel) {
+                                        3 -> AppColorPalette.CyanCta
+                                        2 -> AppColorPalette.WinGreen
+                                        1 -> AppColorPalette.WinGreen.copy(alpha = 0.6f)
+                                        else -> Color.White.copy(alpha = 0.05f)
                                     }
 
                                     Box(

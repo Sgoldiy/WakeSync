@@ -5,6 +5,8 @@ import platform.UIKit.UIViewController
 import com.social.wakesync.app.App
 import com.social.wakesync.feature.profile.IosFirestoreBridge
 import com.social.wakesync.feature.profile.IosFirestoreBridgeHolder
+import com.social.wakesync.feature.home.IosFirestoreHomeBridge
+import com.social.wakesync.feature.home.IosFirestoreHomeBridgeHolder
 
 import androidx.compose.runtime.remember
 import com.social.wakesync.app.MainViewModel
@@ -14,11 +16,14 @@ fun MainViewController(
     isPermissionsGranted: Boolean = false,
     onGoogleSignInRequested: (((String?) -> Unit) -> Unit)? = null,
     firestoreBridge: IosFirestoreBridge? = null,
+    firestoreHomeBridge: IosFirestoreHomeBridge? = null,
 ): UIViewController {
-    // Install the Firestore bridge before returning the controller
+    // Install the Firestore bridges before returning the controller
     if (firestoreBridge != null) {
         IosFirestoreBridgeHolder.bridge = firestoreBridge
     }
+    // IosFirestoreHomeBridgeHolder uses IosFirestoreBridgeHolder directly (typealias)
+    // No separate installation needed — the profile bridge covers both.
 
     return ComposeUIViewController {
         val viewModel = remember { MainViewModel() }

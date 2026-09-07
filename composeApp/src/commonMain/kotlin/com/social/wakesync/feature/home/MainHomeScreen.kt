@@ -91,17 +91,22 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
     var selectedTab by remember { mutableStateOf(HomeTab.HOME) }
     var showAlarmsScreen by remember { mutableStateOf(false) }
     var showSetAlarmScreen by remember { mutableStateOf(false) }
+    var preselectedRivalForAlarm by remember { mutableStateOf<String?>(null) }
     var showAddHabitScreen by remember { mutableStateOf(false) }
     var selectedHabitForDetail by remember { mutableStateOf<Habit?>(null) }
     var activeHabit by remember { mutableStateOf<Habit?>(null) }
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
     var activeStory by remember { mutableStateOf<StoryItem?>(null) }
+    var showCreateStoryScreen by remember { mutableStateOf(false) }
     var selectedUserForProfile by remember { mutableStateOf<String?>(null) }
     var activeChatId by remember { mutableStateOf<String?>(null) }
     var activeFindRivalsId by remember { mutableStateOf(false) }
     var showSettingsScreen by remember { mutableStateOf(false) }
     var showStatsDeepDiveScreen by remember { mutableStateOf(false) }
     var showPremiumScreen by remember { mutableStateOf(false) }
+    var showPunishmentHome by remember { mutableStateOf(false) }
+    var showProofUploadHome by remember { mutableStateOf(false) }
+    var showProofReviewHome by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Emoji Picker State
@@ -120,6 +125,7 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             AlarmState.showStreakSave = true
         }
         val onAlarmFailedHome = {
+            AlarmState.previousStreak = uiState.streak
             val activeId = AlarmState.activeAlarmId ?: ""
             viewModel.recordAlarmLoss(activeId, AlarmState.activeAlarmMode)
             AlarmState.isRinging = false
@@ -170,16 +176,28 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             streakDays = uiState.streak,
             finishPosition = 1,
             totalParticipants = if (AlarmState.activeAlarmMode == "Solo") 1 else 2,
-            sleepingFriends = if (AlarmState.activeAlarmMode == "Solo") emptyList() else listOf("🦁"),
+            sleepingFriends = if (AlarmState.activeAlarmMode == "Solo") emptyList() else {
+                val partnerName = AlarmState.activeAlarmPartnerUsername ?: ""
+                val partnerAvatar = uiState.friends.find { it.name == partnerName }?.avatar ?: "👤"
+                listOf(partnerAvatar)
+            },
             friendsLostCount = 0,
             onBackToHome = { AlarmState.showStreakSave = false },
             titleFamily = titleFamily,
             interFamily = interFamily
         )
     } else if (AlarmState.showStreakBroken) {
+        val activePunishment = viewModel.activePunishment.collectAsStateWithLifecycle().value
         StreakBrokenScreen(
-            previousStreak = uiState.streak + 3,
-            currentStreak = uiState.streak,
+            previousStreak = AlarmState.previousStreak,
+            currentStreak = 0,
+            punishmentText = activePunishment?.let { "${it.punishmentEmoji} ${it.punishmentType}" } ?: "20 pushups 💪",
+            punishmentDetail = activePunishment?.punishmentDetail ?: "Photo proof required · Due 8:30 AM",
+            onCompletePunishment = {
+                AlarmState.showStreakBroken = false
+                showPunishmentHome = true
+            },
+            onUseInsurance = { /* TODO: premium/insurance logic */ },
             onBackToHome = { AlarmState.showStreakBroken = false },
             titleFamily = titleFamily,
             interFamily = interFamily
@@ -241,16 +259,18 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
         )
     } else if (showSetAlarmScreen) {
         SetAlarmScreen(
-            onBack = { showSetAlarmScreen = false },
+            onBack = { showSetAlarmScreen = false; preselectedRivalForAlarm = null },
             onSave = { hour, minute, isAm, days, mode, challenge, partnerUsername, bondName ->
                 viewModel.addAlarm(hour, minute, isAm, days, mode, challenge, partnerUsername, bondName)
+                preselectedRivalForAlarm = null
             },
             titleFamily = titleFamily,
             interFamily = interFamily,
             sounds = uiState.sounds,
             selectedSound = uiState.selectedSound,
             onSoundSelected = { viewModel.selectSound(it) },
-            onSearchUsers = { query -> viewModel.searchUsers(query) }
+            onSearchUsers = { query -> viewModel.searchUsers(query) },
+            preselectedRival = preselectedRivalForAlarm
         )
     } else if (showAlarmsScreen) {
         AlarmsScreen(
@@ -264,8 +284,27 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             username = selectedUserForProfile!!,
             onBack = { selectedUserForProfile = null },
             onChallengeClick = {
+                preselectedRivalForAlarm = selectedUserForProfile
                 showSetAlarmScreen = true
                 selectedUserForProfile = null
+            },
+            titleFamily = titleFamily,
+            interFamily = interFamily
+        )
+    } else if (showCreateStoryScreen) {
+        CreateStoryScreen(
+            userAvatar = uiState.avatarEmoji,
+            username = uiState.userName,
+            onClose = { showCreateStoryScreen = false },
+            onPostStory = { caption, badgeText, badgeColorHex, bgStartHex, bgEndHex ->
+                viewModel.postStory(
+                    caption = caption,
+                    badgeText = badgeText,
+                    badgeColorHex = badgeColorHex,
+                    bgStartHex = bgStartHex,
+                    bgEndHex = bgEndHex,
+                    onComplete = { showCreateStoryScreen = false }
+                )
             },
             titleFamily = titleFamily,
             interFamily = interFamily
@@ -298,6 +337,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             titleFamily = titleFamily,
             interFamily = interFamily,
             currentUsername = uiState.userName.ifEmpty { "nocturnaljake" },
+            notifPrefs = uiState.notificationPreferences,
+            onNotifPrefsChanged = { viewModel.updateNotificationPreferences(it) },
             onBack = { showSettingsScreen = false },
             onPremiumClick = { showPremiumScreen = true }
         )
@@ -306,13 +347,66 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
             onBack = { showStatsDeepDiveScreen = false },
             titleFamily = titleFamily,
             interFamily = interFamily,
-            overallWinRate = 78,
-            soloWinRate = 91,
-            duoWinRate = 72,
-            groupWinRate = 68,
+            overallWinRate = if (uiState.wins + uiState.losses > 0) (uiState.wins * 100 / (uiState.wins + uiState.losses)) else 0,
+            soloWinRate = if (uiState.soloWins + uiState.soloLosses > 0) (uiState.soloWins * 100 / (uiState.soloWins + uiState.soloLosses)) else 0,
+            duoWinRate = if (uiState.duoWins + uiState.duoLosses > 0) (uiState.duoWins * 100 / (uiState.duoWins + uiState.duoLosses)) else 0,
+            groupWinRate = if (uiState.groupWins + uiState.groupLosses > 0) (uiState.groupWins * 100 / (uiState.groupWins + uiState.groupLosses)) else 0,
             currentStreak = uiState.streak,
-            longestStreak = 34,
-            averageStreak = 11
+            longestStreak = uiState.streak,
+            averageStreak = uiState.streak,
+            totalDays = uiState.wins + uiState.losses
+        )
+    } else if (showProofReviewHome) {
+        ProofReviewScreen(
+            onLegit = {
+                val punishment = viewModel.activePunishment.value
+                if (punishment != null) {
+                    viewModel.completePunishment(punishment.id)
+                }
+                showProofReviewHome = false
+            },
+            onSuspicious = {
+                val punishment = viewModel.activePunishment.value
+                if (punishment != null) {
+                    viewModel.completePunishment(punishment.id)
+                }
+                showProofReviewHome = false
+            },
+            onBack = { showProofReviewHome = false },
+            titleFamily = titleFamily,
+            interFamily = interFamily
+        )
+    } else if (showProofUploadHome) {
+        val activePunishment = viewModel.activePunishment.collectAsStateWithLifecycle().value
+        ProofUploadScreen(
+            taskName = activePunishment?.let { "${it.punishmentEmoji} ${it.punishmentType}" } ?: "Upload Proof",
+            onCapture = {
+                val punishment = activePunishment
+                if (punishment != null) {
+                    viewModel.submitProof(punishment.id, "proof_captured_${punishment.id}")
+                }
+                showProofUploadHome = false
+                showProofReviewHome = true
+            },
+            onGallery = { /* TODO: gallery picker */ },
+            onFlash = { /* TODO: toggle flash */ },
+            onBack = { showProofUploadHome = false },
+            titleFamily = titleFamily,
+            interFamily = interFamily
+        )
+    } else if (showPunishmentHome) {
+        val activePunishment = viewModel.activePunishment.collectAsStateWithLifecycle().value
+        PunishmentAssignedScreen(
+            taskName = activePunishment?.let { "${it.punishmentEmoji} ${it.punishmentType}" } ?: "Complete your punishment",
+            taskDescription = activePunishment?.punishmentDetail ?: "Photo proof required",
+            onCompleteProof = {
+                showPunishmentHome = false
+                showProofUploadHome = true
+            },
+            onUseInsurance = { /* TODO: premium logic */ },
+            onBackToHome = { showPunishmentHome = false },
+            titleFamily = titleFamily,
+            interFamily = interFamily
         )
     } else if (activeChatId != null) {
         ChatDetailScreen(
@@ -368,11 +462,18 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                     }
 
                     HomeTab.SOCIAL -> {
+                        val socialFeedFlow = remember(viewModel) { viewModel.getSocialFeed() }
+                        val storiesFlow = remember(viewModel) { viewModel.getStories() }
+                        val feedPosts by socialFeedFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+                        val userStories by storiesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
                         SocialFeedScreen(
                             titleFamily = titleFamily,
                             interFamily = interFamily,
                             onStoryClick = { story -> activeStory = story },
-                            onUserClick = { username -> selectedUserForProfile = username }
+                            onUserClick = { username -> selectedUserForProfile = username },
+                            onCreateStoryClick = { showCreateStoryScreen = true },
+                            feedPosts = feedPosts,
+                            userStories = userStories
                         )
                     }
 
@@ -409,8 +510,6 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                             onStatsClick = { showStatsDeepDiveScreen = true }
                         )
                     }
-
-                    else -> PlaceholderContent(selectedTab.title)
                 }
 
                 if (showEmojiPicker) {
@@ -456,6 +555,12 @@ fun HomeContent(
         modifier = Modifier
             .fillMaxSize()
     ) {
+        // Offline sync indicator
+        com.social.wakesync.ui.components.OfflineStatusBar(
+            isOnline = uiState.isOnline,
+            pendingCount = uiState.pendingSyncCount
+        )
+
         // Sticky Header
         Box(
             modifier = Modifier

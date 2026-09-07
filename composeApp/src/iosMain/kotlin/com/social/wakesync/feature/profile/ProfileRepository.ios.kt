@@ -55,8 +55,20 @@ class IosProfileRepository : ProfileRepository {
     }
 
     override suspend fun updateAvatar(emoji: String): Result<Unit> {
-        // iOS implementation placeholder
-        return Result.success(Unit)
+        val bridge = IosFirestoreBridgeHolder.bridge
+            ?: return Result.failure(Exception("Firestore bridge not configured."))
+        return suspendCancellableCoroutine { continuation ->
+            bridge.setUserDocument(
+                data = mapOf("avatarEmoji" to emoji, "avatar" to emoji),
+                merge = true,
+                onSuccess = {
+                    if (continuation.isActive) continuation.resume(Result.success(Unit))
+                },
+                onError = { error ->
+                    if (continuation.isActive) continuation.resume(Result.failure(Exception(error)))
+                }
+            )
+        }
     }
 }
 

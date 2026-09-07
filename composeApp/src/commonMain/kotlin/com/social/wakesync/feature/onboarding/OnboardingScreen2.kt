@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +54,7 @@ import org.jetbrains.compose.resources.Font
 fun OnboardingScreen2(
     modifier: Modifier = Modifier,
     onNext: () -> Unit = {},
+    onSkip: () -> Unit = {},
 ) {
     val transition = rememberInfiniteTransition(label = "challenge_float_transition")
     val floatingOffset by transition.animateFloat(
@@ -183,7 +185,7 @@ fun OnboardingScreen2(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Next",
+                        text = "Next →",
                         color = Color(0xFF032117),
                         fontSize = 19.sp,
                         fontWeight = FontWeight.W800,
@@ -200,6 +202,7 @@ fun OnboardingScreen2(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.W600,
                 fontFamily = interFamily,
+                modifier = Modifier.clickable(onClick = onSkip)
             )
             Spacer(modifier = Modifier.height(10.dp))
         }

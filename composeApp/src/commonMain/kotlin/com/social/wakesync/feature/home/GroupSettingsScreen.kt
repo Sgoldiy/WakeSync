@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.ui.components.EmptyState
 import com.social.wakesync.ui.theme.AppColorPalette
 
 data class GroupMemberSetting(
@@ -54,6 +55,19 @@ fun GroupSettingsScreen(
     }
 ) {
     var showKickVoteSheet by remember { mutableStateOf(false) }
+
+    // Show empty state when no real members exist
+    if (members.isEmpty()) {
+        EmptyState(
+            emoji = "👥",
+            title = "No group members yet",
+            subtitle = "Invite friends to this group to start competing together.",
+            titleFamily = titleFamily,
+            interFamily = interFamily,
+            modifier = Modifier.fillMaxSize()
+        )
+        return
+    }
 
     if (showKickVoteSheet) {
         KickVoteBottomSheet(
@@ -93,7 +107,7 @@ fun GroupSettingsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "Back",
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)

@@ -11,7 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.ui.components.EmptyState
 import com.social.wakesync.ui.theme.AppColorPalette
 
 data class GroupMember(
@@ -54,9 +55,22 @@ fun GroupLeaderboardScreen(
         )
     }
 ) {
-    val liveMembersState = viewModel?.getGroupLeaderboard(groupTitle)?.collectAsState(initial = initialMembers)
-    val members = liveMembersState?.value ?: initialMembers
+    val liveMembersState = viewModel?.getGroupLeaderboard(groupTitle)?.collectAsState(initial = emptyList())
+    val members = liveMembersState?.value ?: emptyList()
     val memberCount = members.size.coerceAtLeast(1)
+
+    // Show empty state when no group members exist yet
+    if (members.isEmpty() && viewModel != null) {
+        EmptyState(
+            emoji = "👥",
+            title = "No group members yet",
+            subtitle = "Create a Group alarm and invite friends to compete together.",
+            titleFamily = titleFamily,
+            interFamily = interFamily,
+            modifier = Modifier.fillMaxSize()
+        )
+        return
+    }
 
     Column(
         modifier = modifier
@@ -76,7 +90,7 @@ fun GroupLeaderboardScreen(
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
-                        imageVector = Icons.Rounded.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = "Back",
                         tint = Color.White
                     )

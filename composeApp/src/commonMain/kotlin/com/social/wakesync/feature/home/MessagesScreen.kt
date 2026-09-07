@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.ui.components.EmptyState
 import com.social.wakesync.ui.theme.AppColorPalette
 
 @Composable
@@ -31,19 +32,28 @@ fun MessagesScreen(
     titleFamily: FontFamily,
     interFamily: FontFamily,
     onChatClick: (ChatItem) -> Unit,
+    viewModel: HomeViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
-    val chats = remember {
-        listOf(
-            ChatItem("1", "Morning Crew 🌅", "5amclub_dani: Don't be last today 💀", "🌅"),
-            ChatItem("2", "maya.rises", "You: Rematch tomorrow. 6AM.", "🦁"),
-            ChatItem("3", "5AM Club", "Dani finished 1st again 🏆", "⚡"),
-            ChatItem("4", "5amclub_dani", "Don't sleep on me again lol", "🐺"),
-            ChatItem("5", "grind.rio", "Proof submitted. Judge me.", "🐻"),
-            ChatItem("6", "Work Grinders", "nocturnaleve joined the group", "💼")
-        )
+    // Build chats from real alarms that have partners (Duo/Group)
+    val uiState by viewModel?.uiState?.collectAsState() ?: remember { mutableStateOf(com.social.wakesync.feature.home.HomeUiState()) }
+    val chats = remember(uiState.alarms) {
+        uiState.alarms.filter { !it.partnerUsername.isNullOrEmpty() }.map { alarm ->
+            ChatItem(
+                id = alarm.id,
+                title = alarm.bondName ?: alarm.partnerUsername ?: "Chat",
+                lastMessage = "Alarm: ${alarm.time} · ${alarm.mode}",
+                avatar = when (alarm.mode) {
+                    "Duo" -> "👥"
+                    "Group" -> "👥"
+                    else -> "💬"
+                },
+                timeAgo = "",
+                unreadCount = 0
+            )
+        }
     }
 
     val filteredChats = chats.filter {
@@ -64,7 +74,8 @@ fun MessagesScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 text = "Messages",
@@ -73,6 +84,23 @@ fun MessagesScreen(
                 fontWeight = FontWeight.W700,
                 fontFamily = titleFamily
             )
+
+            // New Chat (+) Button
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(AppColorPalette.CyanCta)
+                    .clickable { /* TODO: new chat action */ },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "+",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -126,6 +154,17 @@ fun MessagesScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Empty state or chat list
+        if (filteredChats.isEmpty() && searchQuery.isEmpty()) {
+            EmptyState(
+                emoji = "💬",
+                title = "No messages yet",
+                subtitle = "Start a Duo or Group alarm to chat with your accountability partners.",
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
         // Chat List
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -140,6 +179,7 @@ fun MessagesScreen(
                 )
             }
         }
+        }
     }
 }
 
@@ -147,7 +187,9 @@ data class ChatItem(
     val id: String,
     val title: String,
     val lastMessage: String,
-    val avatar: String
+    val avatar: String,
+    val timeAgo: String = "",
+    val unreadCount: Int = 0
 )
 
 @Composable
@@ -167,24 +209,49 @@ fun ChatRowItem(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar Box (Clean square-rounded container, no badge icon on the right side)
+        // Avatar Box with optional unread badge
         Box(
             modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(AppColorPalette.Surface)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center
+                .size(52.dp),
+            contentAlignment = Alignment.TopEnd
         ) {
-            Text(
-                text = chat.avatar,
-                fontSize = 24.sp
-            )
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(AppColorPalette.Surface)
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = chat.avatar,
+                    fontSize = 24.sp
+                )
+            }
+
+            // Unread count badge
+            if (chat.unreadCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(AppColorPalette.LossRed)
+                        .border(2.dp, AppColorPalette.VoidBg, RoundedCornerShape(99.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = chat.unreadCount.toString(),
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        // Text Content: Title & Message (No time labels or right-side badges/icons)
+        // Text Content: Title & Message
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
@@ -207,6 +274,17 @@ fun ChatRowItem(
                 fontWeight = FontWeight.W400,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Time label
+        if (chat.timeAgo.isNotEmpty()) {
+            Text(
+                text = chat.timeAgo,
+                color = Color.White.copy(alpha = 0.3f),
+                fontSize = 12.sp,
+                fontFamily = interFamily,
+                modifier = Modifier.padding(start = 8.dp)
             )
         }
     }

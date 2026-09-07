@@ -77,7 +77,8 @@ fun SetAlarmScreen(
     sounds: List<SoundMetadata> = emptyList(),
     selectedSound: SoundMetadata? = null,
     onSoundSelected: (SoundMetadata) -> Unit = {},
-    onSearchUsers: (suspend (String) -> List<Friend>)? = null
+    onSearchUsers: (suspend (String) -> List<Friend>)? = null,
+    preselectedRival: String? = null
 ) {
     BackHandler { onBack() }
 
@@ -85,7 +86,7 @@ fun SetAlarmScreen(
     var isAm by remember { mutableStateOf(true) }
     var selectedHour by remember { mutableIntStateOf(6) }
     var selectedMinute by remember { mutableIntStateOf(30) }
-    var selectedMode by remember { mutableStateOf("Solo") }
+    var selectedMode by remember { mutableStateOf(if (preselectedRival != null) "Duo" else "Solo") }
     var selectedChallenge by remember { mutableStateOf("Math") }
     var selectedMathDifficulty by remember { mutableStateOf("Medium") }
     val selectedDays = remember { mutableStateListOf(0, 1, 2, 3, 4) }
@@ -95,8 +96,65 @@ fun SetAlarmScreen(
     // Duo / Group User Search Bottom Sheet State
     var showAddParticipantsSheet by remember { mutableStateOf(false) }
     var showFindRivalsScreen by remember { mutableStateOf(false) }
+    var pendingParticipantUsername by remember { mutableStateOf<String?>(null) }
     val selectedParticipants = remember { mutableStateListOf<String>() }
+    
+    // Pre-fill rival if coming from UserProfileScreen challenge
+    androidx.compose.runtime.LaunchedEffect(preselectedRival) {
+        if (preselectedRival != null && selectedParticipants.isEmpty()) {
+            selectedParticipants.add(preselectedRival)
+        }
+    }
+    
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+
+    // Confirmation dialog before adding partner
+    pendingParticipantUsername?.let { username ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingParticipantUsername = null },
+            title = {
+                Text(
+                    text = "Add Partner?",
+                    fontFamily = titleFamily,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "You're about to add @$username as your ${if (selectedMode == "Duo") "duo partner" else "group member"}. " +
+                        "They'll receive an invitation to join this alarm. Continue?",
+                    fontFamily = interFamily,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    val maxAllowed = if (selectedMode == "Duo") 1 else 7
+                    if (selectedParticipants.size < maxAllowed && !selectedParticipants.contains(username)) {
+                        selectedParticipants.add(username)
+                    }
+                    pendingParticipantUsername = null
+                }) {
+                    Text(
+                        text = "Add Partner",
+                        color = AppColorPalette.CyanCta,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { pendingParticipantUsername = null }) {
+                    Text(
+                        text = "Cancel",
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+            },
+            containerColor = AppColorPalette.Surface,
+            titleContentColor = Color.White,
+            textContentColor = Color.White.copy(alpha = 0.7f)
+        )
+    }
 
     if (showFindRivalsScreen) {
         FindRivalsScreen(
@@ -538,9 +596,9 @@ fun SetAlarmScreen(
                     mode = selectedMode,
                     selectedParticipants = selectedParticipants,
                     onAddParticipant = { username ->
-                        val maxAllowed = if (selectedMode == "Duo") 1 else 7 // You + 1 for Duo = 2 max, You + 7 for Group = 8 max
+                        val maxAllowed = if (selectedMode == "Duo") 1 else 7
                         if (selectedParticipants.size < maxAllowed && !selectedParticipants.contains(username)) {
-                            selectedParticipants.add(username)
+                            pendingParticipantUsername = username
                         }
                     },
                     onRemoveParticipant = { username ->

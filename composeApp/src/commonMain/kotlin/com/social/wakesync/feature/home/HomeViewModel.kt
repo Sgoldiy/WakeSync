@@ -3,11 +3,12 @@ package com.social.wakesync.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.social.wakesync.feature.profile.getProfileRepository
+import com.social.wakesync.getPlatform
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
@@ -56,6 +57,9 @@ data class HomeUiState(
     val sounds: List<SoundMetadata> = emptyList(),
     val selectedSound: SoundMetadata? = null,
     val sortOrder: AlarmSortOrder = AlarmSortOrder.TIME,
+    val notificationPreferences: NotificationPreferences = NotificationPreferences(),
+    val isOnline: Boolean = true,
+    val pendingSyncCount: Int = 0,
     val errorMessage: String? = null
 )
 
@@ -100,6 +104,7 @@ class HomeViewModel : ViewModel() {
     private val homeRepository = getHomeRepository()
     private val alarmScheduler = getAlarmScheduler()
     private val soundPlayer = getSoundPlayer()
+    private val networkMonitor = getNetworkMonitor()
 
     private var nextAlarmTimestamp: Long = 0
 
@@ -107,6 +112,9 @@ class HomeViewModel : ViewModel() {
         observeFirestoreData()
         startClockUpdates()
         seedDatabase()
+        registerPushToken()
+        loadNotificationPreferences()
+        observeNetworkState()
     }
 
     private fun seedDatabase() {
@@ -115,6 +123,65 @@ class HomeViewModel : ViewModel() {
                 homeRepository.seedSoundCatalog()
             } catch (e: Exception) {
                 // Silently fail or log if already seeded
+            }
+        }
+    }
+
+    private fun observeNetworkState() {
+        viewModelScope.launch {
+            networkMonitor.isOnline.collect { online ->
+                _uiState.update { it.copy(isOnline = online) }
+
+                // When coming back online, sync pending operations
+                if (online && PendingOperations.hasPending()) {
+                    syncPendingOperations()
+                }
+            }
+        }
+
+        // Track pending operations count
+        viewModelScope.launch {
+            PendingOperations.pendingOps.collect { ops ->
+                _uiState.update { it.copy(pendingSyncCount = ops.size) }
+            }
+        }
+    }
+
+    private suspend fun syncPendingOperations() {
+        val ops = PendingOperations.pendingOps.value.toList()
+        for (op in ops) {
+            try {
+                when (op.type) {
+                    "habit_toggle" -> {
+                        val habitId = op.payload["habitId"] ?: continue
+                        val isDone = op.payload["isDone"]?.toBoolean() ?: false
+                        homeRepository.toggleHabit(habitId, isDone)
+                    }
+                    "alarm_add" -> {
+                        // Re-add alarm from stored data
+                        val alarmJson = op.payload["alarm"] ?: continue
+                        // Alarm will be re-synced from Firestore on next fetch
+                    }
+                    "habit_add" -> {
+                        // Habit will be re-synced from Firestore on next fetch
+                    }
+                }
+                PendingOperations.removeOperation(op.id)
+            } catch (e: Exception) {
+                // Keep the operation in the queue for next sync attempt
+            }
+        }
+    }
+
+    private fun registerPushToken() {
+        viewModelScope.launch {
+            try {
+                val token = getDeviceToken()
+                if (token != null) {
+                    homeRepository.registerDeviceToken(token, getPlatform().name)
+                }
+            } catch (e: Exception) {
+                // Push token registration is non-critical
             }
         }
     }
@@ -153,7 +220,7 @@ class HomeViewModel : ViewModel() {
                         val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
                         nextAlarmTimestamp = calculateNextOccurrence(hour, minute, nextAlarm.days)
                         _uiState.update { it.copy(
-                            nextAlarmTime = formatAlarmTime(nextAlarm.time),
+                            nextAlarmTime = formatAlarmTime12h(nextAlarm.time),
                             isGroupAlarm = nextAlarm.isGroup,
                             activeAlarmMode = nextAlarm.mode,
                             hasAlarmToday = true
@@ -181,6 +248,7 @@ class HomeViewModel : ViewModel() {
                     }
                 }
             }
+            .catch { _ -> }
             .launchIn(viewModelScope)
 
         homeRepository.getHabits()
@@ -214,6 +282,7 @@ class HomeViewModel : ViewModel() {
                     groupLosses = stats.groupLosses
                 ) }
             }
+            .catch { _ -> }
             .launchIn(viewModelScope)
 
         homeRepository.getFriends()
@@ -222,12 +291,14 @@ class HomeViewModel : ViewModel() {
                     _uiState.update { it.copy(friends = friends) }
                 }
             }
+            .catch { _ -> }
             .launchIn(viewModelScope)
 
         homeRepository.getSoundCatalog()
             .onEach { sounds ->
                 _uiState.update { it.copy(sounds = sounds) }
             }
+            .catch { _ -> }
             .launchIn(viewModelScope)
     }
 
@@ -274,19 +345,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    private fun formatAlarmTime(time: String): String {
-        return try {
-            val parts = time.split(":")
-            var hour = parts[0].toInt()
-            val min = parts[1]
-            val ampm = if (hour >= 12) "PM" else "AM"
-            if (hour > 12) hour -= 12
-            if (hour == 0) hour = 12
-            "$hour:$min $ampm"
-        } catch (_: Exception) {
-            time
-        }
-    }
+    // formatAlarmTime is now formatAlarmTime12h() in AlarmUtils.kt
 
     private suspend fun loadUserProfile() {
         val profileResult = profileRepository.getCurrentProfile()
@@ -313,7 +372,22 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             val result = homeRepository.toggleHabit(habitId, newStatus)
             if (result.isFailure) {
-                _uiState.update { it.copy(errorMessage = "Failed to update habit") }
+                // If offline, queue the operation for later sync
+                if (!_uiState.value.isOnline) {
+                    PendingOperations.addOperation(
+                        PendingOperations.PendingOp(
+                            id = "habit_toggle_$habitId",
+                            type = "habit_toggle",
+                            timestamp = getCurrentTimeMillis(),
+                            payload = mapOf(
+                                "habitId" to habitId,
+                                "isDone" to newStatus.toString()
+                            )
+                        )
+                    )
+                } else {
+                    _uiState.update { it.copy(errorMessage = "Failed to update habit") }
+                }
             }
         }
     }
@@ -359,6 +433,11 @@ class HomeViewModel : ViewModel() {
         return result.getOrDefault(emptyList())
     }
 
+    suspend fun fetchUserProfile(username: String): Friend? {
+        val result = homeRepository.searchUsersByUsername(username)
+        return result.getOrNull()?.firstOrNull { it.name.equals(username, ignoreCase = true) }
+    }
+
     fun getCurrentUserUid(): String? {
         return homeRepository.getCurrentUserUid()
     }
@@ -388,15 +467,64 @@ class HomeViewModel : ViewModel() {
     fun recordAlarmLoss(alarmId: String, mode: String) {
         viewModelScope.launch {
             homeRepository.recordAlarmResult(alarmId, mode, false)
+            // Assign punishment for Duo/Group mode
+            if (mode == "Duo" || mode == "Group") {
+                val challengerUsername = AlarmState.activeAlarmPartnerUsername ?: "Partner"
+                val currentUser = _uiState.value
+                // Look up the challenger's UID from the alarm's partnerUid field
+                val alarm = _uiState.value.alarms.find { it.id == alarmId }
+                val challengerUid = alarm?.partnerUid ?: ""
+                homeRepository.assignPunishment(
+                    alarmId = alarmId,
+                    loserUid = homeRepository.getCurrentUserUid() ?: "",
+                    loserUsername = currentUser.userName,
+                    challengerUid = challengerUid,
+                    challengerUsername = challengerUsername,
+                    mode = mode,
+                    challenge = AlarmState.activeAlarmChallenge
+                ).onSuccess { punishment ->
+                    _activePunishment.value = punishment
+                }
+            }
+        }
+    }
+
+    private val _activePunishment = MutableStateFlow<Punishment?>(null)
+    val activePunishment: StateFlow<Punishment?> = _activePunishment.asStateFlow()
+
+    fun submitProof(punishmentId: String, proofUrl: String) {
+        viewModelScope.launch {
+            homeRepository.submitProof(punishmentId, proofUrl).onSuccess {
+                _activePunishment.value = _activePunishment.value?.copy(
+                    status = "ProofSubmitted",
+                    proofUrl = proofUrl,
+                    proofSubmittedAt = kotlin.time.Clock.System.now().toEpochMilliseconds()
+                )
+            }
+        }
+    }
+
+    fun completePunishment(punishmentId: String) {
+        viewModelScope.launch {
+            homeRepository.completePunishment(punishmentId).onSuccess {
+                _activePunishment.value = null
+            }
+        }
+    }
+
+    fun fetchActivePunishment() {
+        viewModelScope.launch {
+            val punishment = homeRepository.getActivePunishment()
+            _activePunishment.value = punishment
         }
     }
 
     fun getLeaderboard(mode: String, isGlobal: Boolean): Flow<List<LeaderboardUser>> {
-        return homeRepository.getLeaderboard(mode, isGlobal)
+        return homeRepository.getLeaderboard(mode, isGlobal).catch { emit(emptyList()) }
     }
 
     fun getGroupLeaderboard(groupId: String = "Morning Crew"): Flow<List<GroupMember>> {
-        return homeRepository.getGroupLeaderboard(groupId)
+        return homeRepository.getGroupLeaderboard(groupId).catch { emit(emptyList()) }
     }
 
     fun autoSetAlarm() {
@@ -452,40 +580,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    private fun calculateNextOccurrence(hour: Int, minute: Int, days: List<Int>): Long {
-        val timeZone = TimeZone.currentSystemDefault()
-        val now = Clock.System.now().toLocalDateTime(timeZone)
-        
-        // Potential candidates: today, or the upcoming days
-        val candidate = LocalDateTime(now.year, now.month, now.day, hour, minute)
-        
-        // If no days selected, it's a "Once" alarm (today or tomorrow)
-        if (days.isEmpty()) {
-            return if (candidate > now) {
-                candidate.toInstant(timeZone).toEpochMilliseconds()
-            } else {
-                candidate.toInstant(timeZone).plus(1, DateTimeUnit.DAY, timeZone).toEpochMilliseconds()
-            }
-        }
-
-        // If days are selected, find the closest upcoming day (including today if time hasn't passed)
-        // Note: LocalDateTime.dayOfWeek.ordinal is 0=Monday...6=Sunday in some systems, 
-        // but let's assume our UI uses 0=Mon to 6=Sun.
-        val currentDayIdx = now.dayOfWeek.ordinal // 0 (Mon) to 6 (Sun)
-        
-        for (i in 0..7) {
-            val checkDayIdx = (currentDayIdx + i) % 7
-            if (days.contains(checkDayIdx)) {
-                val potentialInstant = candidate.toInstant(timeZone).plus(i, DateTimeUnit.DAY, timeZone)
-                if (potentialInstant > Clock.System.now()) {
-                    return potentialInstant.toEpochMilliseconds()
-                }
-            }
-        }
-        
-        // Fallback to tomorrow if somehow loop fails
-        return candidate.toInstant(timeZone).plus(1, DateTimeUnit.DAY, timeZone).toEpochMilliseconds()
-    }
+    // calculateNextOccurrence is now in AlarmUtils.kt (shared with AlarmService)
 
     fun toggleAlarm(alarmId: String, isEnabled: Boolean) {
         viewModelScope.launch {
@@ -592,5 +687,60 @@ class HomeViewModel : ViewModel() {
         val now = Clock.System.now().toLocalDateTime(timeZone).date
         val alarmDate = Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(timeZone).date
         return now == alarmDate
+    }
+
+    // ── Social Feed (Real-Time) ────────────────────────────────────────
+    fun getSocialFeed(): Flow<List<FeedPost>> {
+        return homeRepository.getSocialFeed().catch { emit(emptyList()) }
+    }
+
+    fun postToFeed(content: String, badge: String) {
+        viewModelScope.launch {
+            homeRepository.postToFeed(content, badge)
+        }
+    }
+
+    // ── Stories (Real-Time) ───────────────────────────────────────────
+    fun getStories(): Flow<List<StoryItem>> {
+        return homeRepository.getStories().catch { emit(emptyList()) }
+    }
+
+    fun postStory(
+        caption: String,
+        badgeText: String,
+        badgeColorHex: String,
+        bgStartHex: String,
+        bgEndHex: String,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            homeRepository.postStory(caption, badgeText, badgeColorHex, bgStartHex, bgEndHex)
+            onComplete()
+        }
+    }
+
+    // ── Notifications (Real-Time) ──────────────────────────────────────
+    fun getNotifications(): Flow<List<FeedNotification>> {
+        return homeRepository.getNotifications()
+    }
+
+    fun markNotificationRead(notificationId: String) {
+        viewModelScope.launch {
+            homeRepository.markNotificationRead(notificationId)
+        }
+    }
+
+    fun loadNotificationPreferences() {
+        viewModelScope.launch {
+            val prefs = homeRepository.getNotificationPreferences()
+            _uiState.update { it.copy(notificationPreferences = prefs) }
+        }
+    }
+
+    fun updateNotificationPreferences(prefs: NotificationPreferences) {
+        _uiState.update { it.copy(notificationPreferences = prefs) }
+        viewModelScope.launch {
+            homeRepository.updateNotificationPreferences(prefs)
+        }
     }
 }

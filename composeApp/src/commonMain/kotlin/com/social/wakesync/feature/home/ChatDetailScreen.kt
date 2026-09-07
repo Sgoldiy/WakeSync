@@ -8,11 +8,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PushPin
@@ -31,16 +32,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.social.wakesync.ui.theme.AppColorPalette
-
-data class MessageItem(
-    val id: String,
-    val sender: String,
-    val avatar: String,
-    val message: String,
-    val timestamp: String,
-    val isIncoming: Boolean,
-    val hasProofPhoto: Boolean = false
-)
+import com.social.wakesync.ui.utils.BackHandler
+import kotlin.time.Clock
 
 @Composable
 fun ChatDetailScreen(
@@ -71,7 +64,10 @@ fun ChatDetailScreen(
         else -> "🌅"
     }
 
+    BackHandler { onBack() }
+
     var messageText by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
     
     // Hardcoded message list mimicking the conversation from the screenshot exactly
     val messages = remember {
@@ -111,7 +107,7 @@ fun ChatDetailScreen(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.Rounded.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "Back",
                     tint = Color.White
                 )
@@ -247,7 +243,14 @@ fun ChatDetailScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
         ) {
+            LaunchedEffect(messages.size) {
+                if (messages.isNotEmpty()) {
+                    listState.animateScrollToItem(messages.size)
+                }
+            }
+
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -372,13 +375,19 @@ fun ChatDetailScreen(
                     .background(AppColorPalette.CyanCta)
                     .clickable {
                         if (messageText.trim().isNotEmpty()) {
+                            val now = Clock.System.now()
+                            val epochSeconds = now.epochSeconds
+                            val totalMinutes = (epochSeconds / 60).toInt()
+                            val hour = (totalMinutes / 60) % 24
+                            val minute = totalMinutes % 60
+                            val sentTime = "$hour:${minute.toString().padStart(2, '0')}"
                             messages.add(
                                 MessageItem(
                                     id = (messages.size + 1).toString(),
                                     sender = "You",
                                     avatar = "",
                                     content = messageText,
-                                    time = "6:37",
+                                    time = sentTime,
                                     isIncoming = false
                                 )
                             )

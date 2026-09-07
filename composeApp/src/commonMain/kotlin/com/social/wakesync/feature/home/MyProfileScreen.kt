@@ -45,19 +45,20 @@ fun MyProfileScreen(
     totalHabits: Int = 127,
     onEditClick: () -> Unit = {},
     onStatsClick: () -> Unit = {},
-    achievements: List<AchievementItem> = remember {
+) {
+    // Compute achievements dynamically from real user data
+    val achievements = remember(streak, wins, losses) {
         listOf(
-            AchievementItem("Early Bird", "🌅", true),
-            AchievementItem("On Fire", "🔥", true),
-            AchievementItem("Speedster", "⚡", true),
-            AchievementItem("Top 50", "🏆", true),
-            AchievementItem("Survivor", "💀", false),
-            AchievementItem("Apex", "👑", false),
-            AchievementItem("Alpha", "🐺", false),
-            AchievementItem("Diamond", "💎", false)
+            AchievementItem("Early Bird", "🌅", streak >= 1),
+            AchievementItem("On Fire", "🔥", streak >= 7),
+            AchievementItem("Speedster", "⚡", wins >= 5),
+            AchievementItem("Top 50", "🏆", wins >= 10),
+            AchievementItem("Survivor", "💀", losses >= 3),
+            AchievementItem("Apex", "👑", streak >= 30),
+            AchievementItem("Alpha", "🐺", wins >= 20),
+            AchievementItem("Diamond", "💎", streak >= 50)
         )
     }
-) {
     Column(
         modifier = modifier
             .fillMaxSize()

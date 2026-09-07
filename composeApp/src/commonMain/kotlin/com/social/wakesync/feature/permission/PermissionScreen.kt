@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,24 +39,28 @@ fun PermissionScreen(
     )
 
     val handler = remember { getPermissionHandler() }
-    
-    var alarmInteracted by remember { mutableStateOf(false) }
-    var notificationInteracted by remember { mutableStateOf(false) }
-    var cameraInteracted by remember { mutableStateOf(false) }
 
-    // Start all permissions as false to force the user to grant them manually
-    var alarmGranted by remember { mutableStateOf(false) }
-    var notificationGranted by remember { mutableStateOf(false) }
-    var cameraGranted by remember { mutableStateOf(false) }
+    // Initialize with real device permission status
+    var alarmGranted by remember { mutableStateOf(handler.isAlarmPermissionGranted()) }
+    var notificationGranted by remember { mutableStateOf(handler.isNotificationPermissionGranted()) }
+    var cameraGranted by remember { mutableStateOf(handler.isCameraPermissionGranted()) }
 
-    // Logic to refresh permissions when returning to the screen
+    fun refreshPermissions() {
+        alarmGranted = handler.isAlarmPermissionGranted()
+        notificationGranted = handler.isNotificationPermissionGranted()
+        cameraGranted = handler.isCameraPermissionGranted()
+    }
+
+    LaunchedEffect(Unit) {
+        refreshPermissions()
+    }
+
+    // Automatically refresh permission states when returning to the app from system settings or permission dialogs
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                if (alarmInteracted) alarmGranted = handler.isAlarmPermissionGranted()
-                if (notificationInteracted) notificationGranted = handler.isNotificationPermissionGranted()
-                if (cameraInteracted) cameraGranted = handler.isCameraPermissionGranted()
+                refreshPermissions()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -64,7 +69,7 @@ fun PermissionScreen(
         }
     }
 
-    val allEssentialGranted = alarmGranted && notificationGranted && cameraGranted
+    val allEssentialGranted = alarmGranted
 
     Box(
         modifier = modifier
@@ -111,8 +116,6 @@ fun PermissionScreen(
                     emoji = "⏰",
                     isGranted = alarmGranted,
                     onToggle = { 
-                        if (!it) return@PermissionItem
-                        alarmInteracted = true
                         handler.requestAlarmPermission() 
                     },
                     interFamily = interFamily
@@ -124,8 +127,6 @@ fun PermissionScreen(
                     emoji = "🔔",
                     isGranted = notificationGranted,
                     onToggle = { 
-                        if (!it) return@PermissionItem
-                        notificationInteracted = true
                         handler.requestNotificationPermission() 
                     },
                     interFamily = interFamily
@@ -137,8 +138,6 @@ fun PermissionScreen(
                     emoji = "📷",
                     isGranted = cameraGranted,
                     onToggle = { 
-                        if (!it) return@PermissionItem
-                        cameraInteracted = true
                         handler.requestCameraPermission() 
                     },
                     interFamily = interFamily
@@ -235,6 +234,7 @@ fun PermissionItem(
                 color = if (isGranted) AppColorPalette.CyanCta.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.04f),
                 shape = RoundedCornerShape(18.dp)
             )
+            .clickable { onToggle(!isGranted) }
             .padding(14.dp)
     ) {
         Row(

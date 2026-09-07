@@ -30,6 +30,9 @@ import com.social.wakesync.feature.home.AlarmPuzzleDuo
 import com.social.wakesync.feature.home.AlarmPuzzleGroup
 import com.social.wakesync.feature.home.StreakSaveScreen
 import com.social.wakesync.feature.home.StreakBrokenScreen
+import com.social.wakesync.feature.home.PunishmentAssignedScreen
+import com.social.wakesync.feature.home.ProofUploadScreen
+import com.social.wakesync.feature.home.ProofReviewScreen
 import com.social.wakesync.feature.home.HomeViewModel
 import com.social.wakesync.feature.home.AlarmLockScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -68,11 +71,16 @@ fun App(
 
     MaterialTheme {
         val homeViewModel: HomeViewModel = viewModel { HomeViewModel() }
-        val homeUiState by homeViewModel.uiState.collectAsState()
+    val homeUiState by homeViewModel.uiState.collectAsState()
 
-        var showLockScreen by remember(AlarmState.isRinging) {
-            mutableStateOf(AlarmState.isRinging)
-        }
+    var showLockScreen by remember(AlarmState.isRinging) {
+        mutableStateOf(AlarmState.isRinging)
+    }
+
+    // Punishment screen navigation states
+    var showPunishment by remember { mutableStateOf(false) }
+    var showProofUpload by remember { mutableStateOf(false) }
+    var showProofReview by remember { mutableStateOf(false) }
 
         if (AlarmState.isRinging) {
             val onAlarmSolved = {
@@ -82,9 +90,11 @@ fun App(
                 AlarmState.showStreakSave = true
             }
             val onAlarmFailed = {
+                AlarmState.previousStreak = homeUiState.streak
                 val activeId = AlarmState.activeAlarmId ?: ""
                 homeViewModel.recordAlarmLoss(activeId, AlarmState.activeAlarmMode)
                 onDismissAlarm()
+                // Wait a moment for punishment to be assigned, then show broken screen
                 AlarmState.showStreakBroken = true
             }
 
@@ -92,7 +102,11 @@ fun App(
                 // Group avatars — shown only for Group/Duo mode
                 val groupAvatars = when (AlarmState.activeAlarmMode) {
                     "Group" -> listOf("🐺", "🦊", "🐻", "🦁")
-                    "Duo"   -> listOf(homeUiState.avatarEmoji.ifEmpty { "🤯" })
+                    "Duo"   -> {
+                        val partnerName = AlarmState.activeAlarmPartnerUsername ?: ""
+                        val partnerAvatar = homeUiState.friends.find { it.name == partnerName }?.avatar ?: "👤"
+                        listOf(homeUiState.avatarEmoji.ifEmpty { "🤯" }, partnerAvatar)
+                    }
                     else    -> emptyList()
                 }
                 AlarmLockScreen(
@@ -115,6 +129,8 @@ fun App(
                             interFamily = interFamily,
                             userName = homeUiState.userName.ifEmpty { "You" },
                             userAvatar = homeUiState.avatarEmoji.ifEmpty { "🤯" },
+                            rivalName = AlarmState.activeAlarmPartnerUsername ?: "Partner",
+                            rivalAvatar = homeUiState.friends.find { it.name == AlarmState.activeAlarmPartnerUsername }?.avatar ?: "👤",
                             alarmId = AlarmState.activeAlarmId,
                             currentUserId = homeViewModel.getCurrentUserUid(),
                             onListenToDuoAlarm = { id -> homeViewModel.listenToDuoAlarm(id) },
@@ -143,7 +159,11 @@ fun App(
                 streakDays = homeUiState.streak,
                 finishPosition = 1,
                 totalParticipants = if (AlarmState.activeAlarmMode == "Solo") 1 else 2,
-                sleepingFriends = if (AlarmState.activeAlarmMode == "Solo") emptyList() else listOf("🦁"),
+                sleepingFriends = if (AlarmState.activeAlarmMode == "Solo") emptyList() else {
+                    val partnerName = AlarmState.activeAlarmPartnerUsername ?: ""
+                    val partnerAvatar = homeUiState.friends.find { it.name == partnerName }?.avatar ?: "👤"
+                    listOf(partnerAvatar)
+                },
                 friendsLostCount = 0,
                 onShareClick = { /* TODO: share logic */ },
                 onBackToHome = { AlarmState.showStreakSave = false },
@@ -151,14 +171,21 @@ fun App(
                 interFamily = interFamily
             )
         } else if (AlarmState.showStreakBroken) {
+            val activePunishment = homeViewModel.activePunishment.collectAsState().value
             StreakBrokenScreen(
-                previousStreak = homeUiState.streak + 3,
-                currentStreak = homeUiState.streak,
-                punishmentText = "20 pushups 💪",
-                punishmentDetail = "Photo proof required · Due 8:30 AM",
-                onCompletePunishment = { AlarmState.showStreakBroken = false },
+                previousStreak = AlarmState.previousStreak,
+                currentStreak = 0,
+                punishmentText = activePunishment?.let { "${it.punishmentEmoji} ${it.punishmentType}" } ?: "20 pushups 💪",
+                punishmentDetail = activePunishment?.punishmentDetail ?: "Photo proof required · Due 8:30 AM",
+                onCompletePunishment = {
+                    AlarmState.showStreakBroken = false
+                    showPunishment = true
+                },
                 onUseInsurance = { /* TODO: insurance/premium logic */ },
-                onBackToHome = { AlarmState.showStreakBroken = false },
+                onBackToHome = {
+                    AlarmState.showStreakBroken = false
+                    showPunishment = false
+                },
                 titleFamily = titleFamily,
                 interFamily = interFamily
             )
@@ -191,10 +218,19 @@ fun App(
                         }
                     ) {
                         when (step) {
-                            1 -> OnboardingScreen1(onNext = { viewModel.nextOnboarding() })
+                            1 -> {
+                                BackHandler { viewModel.previousOnboarding() }
+                                OnboardingScreen1(
+                                    onNext = { viewModel.nextOnboarding() },
+                                    onSkip = { viewModel.nextOnboarding() }
+                                )
+                            }
                             2 -> {
                                 BackHandler { viewModel.previousOnboarding() }
-                                OnboardingScreen2(onNext = { viewModel.nextOnboarding() })
+                                OnboardingScreen2(
+                                    onNext = { viewModel.nextOnboarding() },
+                                    onSkip = { viewModel.nextOnboarding() }
+                                )
                             }
                             else -> {
                                 BackHandler { viewModel.previousOnboarding() }
@@ -235,7 +271,64 @@ fun App(
                     )
                 }
                 is MainUiState.Home -> {
-                    MainHomeScreen()
+                    if (showProofReview) {
+                        ProofReviewScreen(
+                            onLegit = {
+                                // Record the punishment as completed with legit proof
+                                val punishment = homeViewModel.activePunishment.value
+                                if (punishment != null) {
+                                    homeViewModel.completePunishment(punishment.id)
+                                }
+                                showProofReview = false
+                            },
+                            onSuspicious = {
+                                // Still mark as completed but flag for review
+                                val punishment = homeViewModel.activePunishment.value
+                                if (punishment != null) {
+                                    homeViewModel.completePunishment(punishment.id)
+                                }
+                                showProofReview = false
+                            },
+                            onBack = { showProofReview = false },
+                            titleFamily = titleFamily,
+                            interFamily = interFamily
+                        )
+                    } else if (showProofUpload) {
+                        val activePunishment = homeViewModel.activePunishment.collectAsState().value
+                        ProofUploadScreen(
+                            taskName = activePunishment?.let { "${it.punishmentEmoji} ${it.punishmentType}" } ?: "Upload Proof",
+                            onCapture = {
+                                // Submit proof with a placeholder URL (camera capture would upload to storage)
+                                val punishment = activePunishment
+                                if (punishment != null) {
+                                    homeViewModel.submitProof(punishment.id, "proof_captured_${punishment.id}")
+                                }
+                                showProofUpload = false
+                                showProofReview = true
+                            },
+                            onGallery = { /* TODO: gallery picker */ },
+                            onFlash = { /* TODO: toggle flash */ },
+                            onBack = { showProofUpload = false },
+                            titleFamily = titleFamily,
+                            interFamily = interFamily
+                        )
+                    } else if (showPunishment) {
+                        val activePunishment = homeViewModel.activePunishment.collectAsState().value
+                        PunishmentAssignedScreen(
+                            taskName = activePunishment?.let { "${it.punishmentEmoji} ${it.punishmentType}" } ?: "Complete your punishment",
+                            taskDescription = activePunishment?.punishmentDetail ?: "Photo proof required",
+                            onCompleteProof = {
+                                showPunishment = false
+                                showProofUpload = true
+                            },
+                            onUseInsurance = { /* TODO: premium logic */ },
+                            onBackToHome = { showPunishment = false },
+                            titleFamily = titleFamily,
+                            interFamily = interFamily
+                        )
+                    } else {
+                        MainHomeScreen()
+                    }
                 }
             }
         }

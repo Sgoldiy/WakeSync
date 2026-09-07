@@ -22,14 +22,17 @@ class IosAlarmScheduler : AlarmScheduler {
             setTitle(if (alarm.mode == "Solo") "⏰ Solo Wake Up!" else alarm.label)
             setBody("It's ${alarm.time}! Time to wake up and sync.")
 
-            // For Solo mode, we try to use a specific sound file.
-            // On iOS, the sound file must be in the main bundle (e.g. solo_alarm.wav)
-            val notificationSound = if (alarm.mode == "Solo") {
-                UNNotificationSound.soundNamed("solo_alarm.wav")
+            // Use custom sound if available, fallback to default notification sound
+            // Note: defaultCriticalSound() requires 'critical-alerts' entitlement
+            val customSoundName = alarm.soundId?.let { "$it.wav" }
+            val notificationSound = if (customSoundName != null) {
+                UNNotificationSound.soundNamed(customSoundName)
+            } else null
+            if (notificationSound != null) {
+                setSound(notificationSound)
             } else {
-                UNNotificationSound.defaultCriticalSound()
+                setSound(UNNotificationSound.defaultSound)
             }
-            setSound(notificationSound)
 
             setUserInfo(
                 mapOf(

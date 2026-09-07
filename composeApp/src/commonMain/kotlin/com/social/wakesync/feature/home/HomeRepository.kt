@@ -24,8 +24,36 @@ interface HomeRepository {
     suspend fun deleteHabit(habitId: String): Result<Unit>
     suspend fun updateHabit(habit: Habit): Result<Unit>
     suspend fun recordAlarmResult(alarmId: String, mode: String, isWin: Boolean): Result<Unit>
+    suspend fun assignPunishment(
+        alarmId: String,
+        loserUid: String,
+        loserUsername: String,
+        challengerUid: String,
+        challengerUsername: String,
+        mode: String,
+        challenge: String
+    ): Result<Punishment>
+    suspend fun getActivePunishment(): Punishment?
+    suspend fun submitProof(punishmentId: String, proofUrl: String): Result<Unit>
+    suspend fun completePunishment(punishmentId: String): Result<Unit>
     fun getLeaderboard(mode: String, isGlobal: Boolean): Flow<List<LeaderboardUser>>
     fun getGroupLeaderboard(groupId: String = "Morning Crew"): Flow<List<GroupMember>>
+    fun getSocialFeed(): Flow<List<FeedPost>>
+    suspend fun postToFeed(content: String, badge: String): Result<Unit>
+    fun getNotifications(): Flow<List<FeedNotification>>
+    fun getStories(): Flow<List<StoryItem>>
+    suspend fun postStory(caption: String, badgeText: String, badgeColorHex: String, bgStartHex: String, bgEndHex: String): Result<Unit>
+    suspend fun markNotificationRead(notificationId: String): Result<Unit>
+    suspend fun getNotificationPreferences(): NotificationPreferences
+    suspend fun updateNotificationPreferences(prefs: NotificationPreferences): Result<Unit>
+    suspend fun registerDeviceToken(token: String, platform: String): Result<Unit>
+    suspend fun sendPushNotification(
+        toUid: String,
+        title: String,
+        body: String,
+        type: String,
+        data: Map<String, String> = emptyMap()
+    ): Result<Unit>
 }
 
 data class SoundMetadata(
@@ -33,6 +61,26 @@ data class SoundMetadata(
     val name: String = "",
     val url: String = "",
     val category: String = "Solo" // e.g., "Solo", "Battle", "Chill"
+)
+
+data class Punishment(
+    val id: String = "",
+    val loserUid: String = "",
+    val loserUsername: String = "",
+    val challengerUid: String = "",
+    val challengerUsername: String = "",
+    val alarmId: String = "",
+    val mode: String = "Solo", // Solo, Duo, Group
+    val challenge: String = "",
+    val punishmentType: String = "",
+    val punishmentEmoji: String = "",
+    val punishmentDetail: String = "",
+    val status: String = "Assigned", // Assigned, ProofSubmitted, Completed, Escalated, Expired
+    val createdAt: Long = 0L,
+    val dueAt: Long = 0L,
+    val proofUrl: String? = null,
+    val proofSubmittedAt: Long? = null,
+    val completedAt: Long? = null
 )
 
 data class AlarmData(
@@ -68,6 +116,40 @@ data class HomeStats(
     val groupStreak: Int = 0,
     val groupWins: Int = 0,
     val groupLosses: Int = 0
+)
+
+data class FeedPost(
+    val id: String = "",
+    val userId: String = "",
+    val username: String = "",
+    val avatar: String = "",
+    val content: String = "",
+    val badgeText: String = "",
+    val badgeColorHex: String = "#22C55E",
+    val streak: Int = 0,
+    val createdAt: Long = 0L,
+    val reactions: Map<String, Int> = emptyMap()
+)
+
+data class FeedNotification(
+    val id: String = "",
+    val type: String = "",
+    val message: String = "",
+    val fromUsername: String = "",
+    val fromUid: String = "",
+    val punishmentId: String? = null,
+    val createdAt: Long = 0L,
+    val read: Boolean = false
+)
+
+data class NotificationPreferences(
+    val alarmSoundsEnabled: Boolean = true,
+    val punishmentSoundsEnabled: Boolean = true,
+    val socialSoundsEnabled: Boolean = true,
+    val vibrationEnabled: Boolean = true,
+    val soundVolume: Float = 1.0f,
+    val quietHoursStart: Int = -1,
+    val quietHoursEnd: Int = -1
 )
 
 expect fun getHomeRepository(): HomeRepository

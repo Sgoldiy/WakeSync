@@ -10,6 +10,8 @@ object AlarmState {
     var activeAlarmMode by mutableStateOf("Solo")
     var activeAlarmChallenge by mutableStateOf("Math")
     var activeAlarmPartnerUsername by mutableStateOf<String?>(null)
+    var previousStreak by mutableStateOf(0)
     var showStreakSave by mutableStateOf(false)
     var showStreakBroken by mutableStateOf(false)
+    var activePunishment by mutableStateOf<Punishment?>(null)
 }
