@@ -59,19 +59,6 @@ fun GroupLeaderboardScreen(
     val members = liveMembersState?.value ?: emptyList()
     val memberCount = members.size.coerceAtLeast(1)
 
-    // Show empty state when no group members exist yet
-    if (members.isEmpty() && viewModel != null) {
-        EmptyState(
-            emoji = "👥",
-            title = "No group members yet",
-            subtitle = "Create a Group alarm and invite friends to compete together.",
-            titleFamily = titleFamily,
-            interFamily = interFamily,
-            modifier = Modifier.fillMaxSize()
-        )
-        return
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -222,17 +209,30 @@ fun GroupLeaderboardScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Full Members Leaderboard List
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(bottom = 24.dp)
-        ) {
-            items(members) { member ->
-                GroupMemberRowItem(
-                    member = member,
-                    titleFamily = titleFamily,
-                    interFamily = interFamily
-                )
+        if (members.isEmpty()) {
+            EmptyState(
+                emoji = "👥",
+                title = "No group members yet",
+                subtitle = "Create a Group alarm and invite friends to compete together.",
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
+            ) {
+                items(members) { member ->
+                    GroupMemberRowItem(
+                        member = member,
+                        titleFamily = titleFamily,
+                        interFamily = interFamily
+                    )
+                }
             }
         }
     }

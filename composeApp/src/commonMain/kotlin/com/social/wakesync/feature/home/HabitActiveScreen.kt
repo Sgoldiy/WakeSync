@@ -162,7 +162,7 @@ fun HabitActiveScreen(
                                         )
                                     )
                                 )
-                                .clickable { onToggleDone(habit.id) },
+                                .clickable(enabled = false) { },
                             contentAlignment = Alignment.Center
                         ) {
                             Column(

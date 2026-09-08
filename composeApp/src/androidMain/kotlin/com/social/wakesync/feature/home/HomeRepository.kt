@@ -87,11 +87,16 @@ class AndroidHomeRepository : HomeRepository {
                     val groupWins = snapshot.getLong("groupAlarmWins")?.toInt() ?: 0
                     val groupLosses = snapshot.getLong("groupAlarmLosses")?.toInt() ?: 0
                     
+                    val habitStreak = snapshot.getLong("habitStreak")?.toInt() ?: 0
+                    val habitWins = snapshot.getLong("habitWins")?.toInt() ?: 0
+                    val habitLosses = snapshot.getLong("habitLosses")?.toInt() ?: 0
+                    
                     trySend(HomeStats(
                         streak, wins, losses, rank,
                         soloStreak, soloWins, soloLosses,
                         duoStreak, duoWins, duoLosses,
-                        groupStreak, groupWins, groupLosses
+                        groupStreak, groupWins, groupLosses,
+                        habitStreak, habitWins, habitLosses
                     ))
                 }
             }
@@ -227,15 +232,33 @@ class AndroidHomeRepository : HomeRepository {
             val snapshot = habitRef.get().await()
             if (!snapshot.exists()) return Result.failure(Exception("Habit not found"))
             
+            val alreadyDone = snapshot.getBoolean("isDone") ?: false
+            if (alreadyDone) {
+                // Habit already completed — undoing is disabled per app specification
+                return Result.success(Unit)
+            }
+
             val partnerUsername = snapshot.getString("partnerUsername") ?: ""
             val bondName = snapshot.getString("bondName") ?: ""
             val currentStreak = snapshot.getLong("streak")?.toInt() ?: 0
             
+            // Increment overall user habit streak on profile
+            val userDocRef = db.collection("users").document(user.uid)
+            val userDoc = userDocRef.get().await()
+            val userHabitStreak = userDoc.getLong("habitStreak")?.toInt() ?: 0
+            val userHabitWins = userDoc.getLong("habitWins")?.toInt() ?: 0
+            userDocRef.update(
+                mapOf(
+                    "habitStreak" to userHabitStreak + 1,
+                    "habitWins" to userHabitWins + 1
+                )
+            ).await()
+
             if (partnerUsername.isBlank()) {
-                // Solo Habit: standard increment/reset
-                val newStreak = if (isDone) currentStreak + 1 else maxOf(0, currentStreak - 1)
+                // Solo Habit: standard increment
+                val newStreak = currentStreak + 1
                 habitRef.update(
-                    "isDone", isDone,
+                    "isDone", true,
                     "streak", newStreak
                 ).await()
             } else {

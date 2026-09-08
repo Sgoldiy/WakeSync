@@ -115,7 +115,10 @@ data class HomeStats(
     val duoLosses: Int = 0,
     val groupStreak: Int = 0,
     val groupWins: Int = 0,
-    val groupLosses: Int = 0
+    val groupLosses: Int = 0,
+    val habitStreak: Int = 0,
+    val habitWins: Int = 0,
+    val habitLosses: Int = 0
 )
 
 data class FeedPost(

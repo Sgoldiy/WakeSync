@@ -60,21 +60,6 @@ fun LeaderboardScreen(
         } ?: emptyList()
     }
 
-    val hasRealData = liveList != null && liveList.isNotEmpty()
-
-    // Show animated empty state when no real data exists yet
-    if (!hasRealData) {
-        EmptyState(
-            emoji = "🏆",
-            title = "Leaderboard is empty",
-            subtitle = "Add friends and start waking up together. Your rankings will appear here once you and your friends have alarm data.",
-            titleFamily = titleFamily,
-            interFamily = interFamily,
-            modifier = Modifier.fillMaxSize()
-        )
-        return
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -313,6 +298,17 @@ fun LeaderboardScreen(
                     )
                 }
             }
+        } else if (activeList.isEmpty()) {
+            EmptyState(
+                emoji = "🏆",
+                title = "No $selectedMode Rankings Yet",
+                subtitle = if (selectedTab == "Friends") "Add friends to compete on the $selectedMode leaderboard!" else "Complete your first $selectedMode alarm challenge to claim your rank!",
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
         }
     }
 }

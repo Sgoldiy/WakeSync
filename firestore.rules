@@ -40,7 +40,7 @@ service cloud.firestore {
       allow update: if request.auth != null
                     && (request.auth.uid == userId
                         || request.resource.data.diff(resource.data).affectedKeys()
-                           .hasAny(['streak', 'wins', 'losses', 'soloAlarmStreak', 'soloAlarmWins', 'soloAlarmLosses', 'duoAlarmStreak', 'duoAlarmWins', 'duoAlarmLosses', 'groupAlarmStreak', 'groupAlarmWins', 'groupAlarmLosses']));
+                           .hasAny(['streak', 'wins', 'losses', 'soloAlarmStreak', 'soloAlarmWins', 'soloAlarmLosses', 'duoAlarmStreak', 'duoAlarmWins', 'duoAlarmLosses', 'groupAlarmStreak', 'groupAlarmWins', 'groupAlarmLosses', 'habitStreak', 'habitWins', 'habitLosses']));
 
       allow delete: if request.auth != null
                     && request.auth.uid == userId;

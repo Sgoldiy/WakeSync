@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.ui.components.EmptyState
 import com.social.wakesync.ui.theme.AppColorPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -264,30 +265,45 @@ fun SocialFeedScreen(
                 }
 
                 // Activity Feed Cards (Matches exact space between two cards and edges)
-                items(feedItems, key = { it.id }) { item ->
-                    ActivityCard(
-                        item = item,
-                        titleFamily = titleFamily,
-                        interFamily = interFamily,
-                        onReplyClick = { replyingToItem = item },
-                        onReactionClick = { emoji ->
-                            val reactionKey = "${item.id}_$emoji"
-                            if (reactionKey !in reactedEmojis) {
-                                reactedEmojis = reactedEmojis + reactionKey
-                                feedItems = feedItems.map { fit ->
-                                    if (fit.id == item.id) {
-                                        fit.copy(
-                                            reactions = fit.reactions.map { (e, c) ->
-                                                if (e == emoji) e to (c + 1) else e to c
-                                            }
-                                        )
-                                    } else fit
+                if (feedItems.isEmpty()) {
+                    item {
+                        EmptyState(
+                            emoji = "📡",
+                            title = "No Feed Posts Yet",
+                            subtitle = "Be the first to share your morning wake-up win or streak milestone with the community!",
+                            titleFamily = titleFamily,
+                            interFamily = interFamily,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp)
+                        )
+                    }
+                } else {
+                    items(feedItems, key = { it.id }) { item ->
+                        ActivityCard(
+                            item = item,
+                            titleFamily = titleFamily,
+                            interFamily = interFamily,
+                            onReplyClick = { replyingToItem = item },
+                            onReactionClick = { emoji ->
+                                val reactionKey = "${item.id}_$emoji"
+                                if (reactionKey !in reactedEmojis) {
+                                    reactedEmojis = reactedEmojis + reactionKey
+                                    feedItems = feedItems.map { fit ->
+                                        if (fit.id == item.id) {
+                                            fit.copy(
+                                                reactions = fit.reactions.map { (e, c) ->
+                                                    if (e == emoji) e to (c + 1) else e to c
+                                                }
+                                            )
+                                        } else fit
+                                    }
                                 }
-                            }
-                        },
-                        onUserClick = onUserClick
-                    )
-                    Spacer(modifier = Modifier.height(12.dp)) // Same spacing as the screenshot
+                            },
+                            onUserClick = onUserClick
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                 }
             }
         }

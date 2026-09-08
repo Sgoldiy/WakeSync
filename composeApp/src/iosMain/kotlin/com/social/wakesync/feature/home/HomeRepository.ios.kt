@@ -355,13 +355,22 @@ class IosHomeRepository : HomeRepository {
     }
 
     override suspend fun toggleHabit(habitId: String, isDone: Boolean): Result<Unit> {
+        val habit = _habits.value.find { it.id == habitId }
+        if (habit?.isDone == true) {
+            return Result.success(Unit)
+        }
         val b = bridge() ?: return Result.failure(Exception("Bridge not available"))
+        val newStreak = (habit?.streak ?: 0) + 1
+        _stats.value = _stats.value.copy(
+            habitStreak = _stats.value.habitStreak + 1,
+            habitWins = _stats.value.habitWins + 1
+        )
         return suspendCancellableCoroutine { continuation ->
             b.updateHabit(
                 habitId = habitId,
-                data = mapOf("isDone" to isDone),
+                data = mapOf("isDone" to true, "streak" to newStreak),
                 onSuccess = {
-                    _habits.value = _habits.value.map { if (it.id == habitId) it.copy(isDone = isDone) else it }
+                    _habits.value = _habits.value.map { if (it.id == habitId) it.copy(isDone = true, streak = newStreak) else it }
                     if (continuation.isActive) continuation.resume(Result.success(Unit))
                 },
                 onError = { error ->

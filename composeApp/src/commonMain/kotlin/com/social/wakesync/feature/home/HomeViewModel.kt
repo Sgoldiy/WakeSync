@@ -34,6 +34,9 @@ data class HomeUiState(
     val groupStreak: Int = 0,
     val groupWins: Int = 0,
     val groupLosses: Int = 0,
+    val habitStreak: Int = 0,
+    val habitWins: Int = 0,
+    val habitLosses: Int = 0,
     val nextAlarmTime: String = "6:30 AM",
     val timeLeftToAlarm: String = "9h 14m",
     val isGroupAlarm: Boolean = true,
@@ -279,7 +282,10 @@ class HomeViewModel : ViewModel() {
                     duoLosses = stats.duoLosses,
                     groupStreak = stats.groupStreak,
                     groupWins = stats.groupWins,
-                    groupLosses = stats.groupLosses
+                    groupLosses = stats.groupLosses,
+                    habitStreak = stats.habitStreak,
+                    habitWins = stats.habitWins,
+                    habitLosses = stats.habitLosses
                 ) }
             }
             .catch { _ -> }
@@ -359,16 +365,27 @@ class HomeViewModel : ViewModel() {
 
     fun toggleHabit(habitId: String) {
         val habit = _uiState.value.habits.find { it.id == habitId } ?: return
-        val newStatus = !habit.isDone
-        
+        // Once a habit is completed, it CANNOT be undone!
+        if (habit.isDone) return
+
+        val newStatus = true
         val updatedHabits = _uiState.value.habits.map {
             if (it.id == habitId) {
-                val newStreak = if (newStatus) it.streak + 1 else maxOf(0, it.streak - 1)
-                it.copy(isDone = newStatus, streak = newStreak)
+                it.copy(isDone = true, streak = it.streak + 1)
             } else it
         }
-        _uiState.update { it.copy(habits = updatedHabits) }
-        
+
+        val maxHabitStreak = updatedHabits.maxOfOrNull { it.streak } ?: 0
+        val habitWinsCount = updatedHabits.count { it.isDone }
+
+        _uiState.update {
+            it.copy(
+                habits = updatedHabits,
+                habitStreak = maxOf(it.habitStreak + 1, maxHabitStreak),
+                habitWins = habitWinsCount
+            )
+        }
+
         viewModelScope.launch {
             val result = homeRepository.toggleHabit(habitId, newStatus)
             if (result.isFailure) {
@@ -381,7 +398,7 @@ class HomeViewModel : ViewModel() {
                             timestamp = getCurrentTimeMillis(),
                             payload = mapOf(
                                 "habitId" to habitId,
-                                "isDone" to newStatus.toString()
+                                "isDone" to "true"
                             )
                         )
                     )
@@ -459,12 +476,14 @@ class HomeViewModel : ViewModel() {
     }
 
     fun recordAlarmWin(alarmId: String, mode: String) {
+        _uiState.update { it.copy(streak = it.streak + 1, wins = it.wins + 1) }
         viewModelScope.launch {
             homeRepository.recordAlarmResult(alarmId, mode, true)
         }
     }
 
     fun recordAlarmLoss(alarmId: String, mode: String) {
+        _uiState.update { it.copy(streak = 0, losses = it.losses + 1) }
         viewModelScope.launch {
             homeRepository.recordAlarmResult(alarmId, mode, false)
             // Assign punishment for Duo/Group mode

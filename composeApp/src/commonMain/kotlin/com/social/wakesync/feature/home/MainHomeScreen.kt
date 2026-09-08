@@ -31,8 +31,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -586,12 +591,16 @@ fun HomeContent(
         ) {
             Spacer(modifier = Modifier.height(20.dp)) // Increased to 20dp
             StreakCard(
-                uiState.streak,
-                uiState.wins,
-                uiState.losses,
-                uiState.rank,
-                titleFamily,
-                interFamily
+                streak = uiState.streak,
+                wins = uiState.wins,
+                losses = uiState.losses,
+                rank = uiState.rank,
+                habitStreak = uiState.habitStreak,
+                habitWins = uiState.habitWins,
+                completedHabitsCount = uiState.habits.count { it.isDone },
+                totalHabitsCount = uiState.habits.size,
+                titleFamily = titleFamily,
+                interFamily = interFamily
             )
             Spacer(modifier = Modifier.height(10.dp))
             AlarmCard(
@@ -878,15 +887,22 @@ fun EmojiPickerContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun StreakCard(
     streak: Int,
     wins: Int,
     losses: Int,
     rank: String,
+    habitStreak: Int,
+    habitWins: Int,
+    completedHabitsCount: Int,
+    totalHabitsCount: Int,
     titleFamily: FontFamily,
     interFamily: FontFamily,
 ) {
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val coroutineScope = rememberCoroutineScope()
     val transition = rememberInfiniteTransition(label = "streak_card_anim")
 
     // Background Animation: Soft drifting stars/particles and nebulae
@@ -969,7 +985,6 @@ fun StreakCard(
                         1f
                     }
 
-                    // Draw a small cross/star shape for some particles
                     if (i % 4 == 0) {
                         val starSize = 2f + (i % 2)
                         drawLine(
@@ -999,84 +1014,215 @@ fun StreakCard(
                     .fillMaxWidth()
                     .padding(
                         horizontal = 20.dp,
-                        vertical = 6.dp
-                    ) // Vertical padding reduced (Total -4dp)
-            ) {
-                Text(
-                    text = "CURRENT STREAK",
-                    color = Color.White.copy(alpha = 0.4f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.W900,
-                    fontFamily = interFamily,
-                    letterSpacing = 0.8.sp
-                )
-
-                Row(
-                    verticalAlignment = Alignment.Bottom, // Fix: Align flame to bottom right of number
-                    modifier = Modifier.offset(y = (-4).dp)
-                ) {
-                    Text(
-                        text = streak.toString(),
-                        color = Color.White,
-                        fontSize = 76.sp,
-                        fontWeight = FontWeight.W900,
-                        fontFamily = titleFamily,
-                        lineHeight = 76.sp
+                        vertical = 12.dp
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .padding(bottom = 10.dp) // Pushes flame to match baseline of the number
-                            .size(50.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Soft Glow for the custom fire icon
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .background(
-                                    Brush.radialGradient(
-                                        colors = listOf(
-                                            Color(0xFFFF8A3D).copy(alpha = 0.35f),
-                                            Color.Transparent
-                                        )
+            ) {
+                // Top Row: Interactive Tab Pills + Page Indicator Dots
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("🔥 Alarm Streak", "🌱 Habit Streak").forEachIndexed { pageIndex, title ->
+                            val isSelected = pagerState.currentPage == pageIndex
+                            val badgeColor = if (pageIndex == 0) AppColorPalette.StreakFireStart else Color(0xFF00FF94)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) badgeColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.04f))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) badgeColor else Color.White.copy(alpha = 0.08f),
+                                        RoundedCornerShape(12.dp)
                                     )
+                                    .clickable {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(pageIndex)
+                                        }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = title,
+                                    color = if (isSelected) badgeColor else Color.White.copy(alpha = 0.5f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = interFamily
                                 )
-                        )
-                        FlameIcon(modifier = Modifier.size(34.dp))
+                            }
+                        }
+                    }
+
+                    // Page Indicator Dots
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(2) { pageIndex ->
+                            val isSelected = pagerState.currentPage == pageIndex
+                            Box(
+                                modifier = Modifier
+                                    .size(if (isSelected) 8.dp else 6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.2f))
+                                    .clickable {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(pageIndex)
+                                        }
+                                    }
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(2.dp)) // Spacer reduced (Total -4dp)
+                Spacer(modifier = Modifier.height(4.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    StatItem(
-                        label = "Wins",
-                        value = "${wins}W",
-                        color = AppColorPalette.WinGreen,
-                        modifier = Modifier.weight(1f),
-                        titleFamily = titleFamily,
-                        interFamily = interFamily
-                    )
-                    StatItem(
-                        label = "Losses",
-                        value = "${losses}L",
-                        color = Color(0xFFF54291),
-                        modifier = Modifier.weight(1f),
-                        titleFamily = titleFamily,
-                        interFamily = interFamily
-                    )
-                    StatItem(
-                        label = "Rank",
-                        value = rank,
-                        color = Color(0xFFFFD23D),
-                        modifier = Modifier.weight(1f),
-                        titleFamily = titleFamily,
-                        interFamily = interFamily
-                    )
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxWidth()
+                ) { page ->
+                    if (page == 0) {
+                        // Slide 1: Alarm Streak (Default)
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.Bottom,
+                                modifier = Modifier.offset(y = (-4).dp)
+                            ) {
+                                Text(
+                                    text = streak.toString(),
+                                    color = Color.White,
+                                    fontSize = 76.sp,
+                                    fontWeight = FontWeight.W900,
+                                    fontFamily = titleFamily,
+                                    lineHeight = 76.sp
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .padding(bottom = 10.dp)
+                                        .size(50.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(46.dp)
+                                            .background(
+                                                Brush.radialGradient(
+                                                    colors = listOf(
+                                                        Color(0xFFFF8A3D).copy(alpha = 0.35f),
+                                                        Color.Transparent
+                                                    )
+                                                )
+                                            )
+                                    )
+                                    FlameIcon(modifier = Modifier.size(34.dp))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                StatItem(
+                                    label = "Wins",
+                                    value = "${wins}W",
+                                    color = AppColorPalette.WinGreen,
+                                    modifier = Modifier.weight(1f),
+                                    titleFamily = titleFamily,
+                                    interFamily = interFamily
+                                )
+                                StatItem(
+                                    label = "Losses",
+                                    value = "${losses}L",
+                                    color = Color(0xFFF54291),
+                                    modifier = Modifier.weight(1f),
+                                    titleFamily = titleFamily,
+                                    interFamily = interFamily
+                                )
+                                StatItem(
+                                    label = "Rank",
+                                    value = rank,
+                                    color = Color(0xFFFFD23D),
+                                    modifier = Modifier.weight(1f),
+                                    titleFamily = titleFamily,
+                                    interFamily = interFamily
+                                )
+                            }
+                        }
+                    } else {
+                        // Slide 2: Habit Streak
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.Bottom,
+                                modifier = Modifier.offset(y = (-4).dp)
+                            ) {
+                                Text(
+                                    text = habitStreak.toString(),
+                                    color = Color.White,
+                                    fontSize = 76.sp,
+                                    fontWeight = FontWeight.W900,
+                                    fontFamily = titleFamily,
+                                    lineHeight = 76.sp
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .padding(bottom = 10.dp)
+                                        .size(50.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(46.dp)
+                                            .background(
+                                                Brush.radialGradient(
+                                                    colors = listOf(
+                                                        Color(0xFF00FF94).copy(alpha = 0.35f),
+                                                        Color.Transparent
+                                                    )
+                                                )
+                                            )
+                                    )
+                                    Text(text = "🌱", fontSize = 34.sp)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                StatItem(
+                                    label = "Habits Done",
+                                    value = "${completedHabitsCount}/${totalHabitsCount}",
+                                    color = Color(0xFF00FF94),
+                                    modifier = Modifier.weight(1f),
+                                    titleFamily = titleFamily,
+                                    interFamily = interFamily
+                                )
+                                StatItem(
+                                    label = "Total Wins",
+                                    value = "${habitWins}W",
+                                    color = Color(0xFF00E5FF),
+                                    modifier = Modifier.weight(1f),
+                                    titleFamily = titleFamily,
+                                    interFamily = interFamily
+                                )
+                                StatItem(
+                                    label = "Habit Level",
+                                    value = "Lv.${(habitStreak / 5) + 1}",
+                                    color = Color(0xFFFFD23D),
+                                    modifier = Modifier.weight(1f),
+                                    titleFamily = titleFamily,
+                                    interFamily = interFamily
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1841,7 +1987,7 @@ fun HabitItem(
                         ),
                         shape = CircleShape
                     )
-                    .clickable { onHabitToggle(habit.id) },
+                    .clickable(enabled = !habit.isDone) { onHabitToggle(habit.id) },
                 contentAlignment = Alignment.Center
             ) {
                 if (habit.isDone) {

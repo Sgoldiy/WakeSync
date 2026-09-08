@@ -367,12 +367,37 @@ fun AddHabitScreen(
                         )
 
                         if (friends.isEmpty()) {
-                            Text(
-                                text = "No friends added yet to invite.",
-                                color = Color.White.copy(alpha = 0.3f),
-                                fontSize = 12.sp,
-                                fontFamily = interFamily
-                            )
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = AppColorPalette.Surface),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text("👥", fontSize = 24.sp)
+                                    Column {
+                                        Text(
+                                            text = "No friends added yet to invite",
+                                            color = Color.White.copy(alpha = 0.85f),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontFamily = interFamily
+                                        )
+                                        Text(
+                                            text = "Add friends from Social tab to unlock Duo & Group habits!",
+                                            color = Color.White.copy(alpha = 0.4f),
+                                            fontSize = 11.sp,
+                                            fontFamily = interFamily
+                                        )
+                                    }
+                                }
+                            }
                         } else {
                             LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
