@@ -2,9 +2,13 @@ package com.social.wakesync.feature.home
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -13,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
@@ -21,15 +26,70 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.decodeToImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+// ── Photo Filter Presets (ColorMatrix-based, KMP-safe) ─────────────────────
+enum class StoryPhotoFilter(
+    val displayName: String,
+    val icon: String,
+    val matrix: ColorMatrix?
+) {
+    NONE("Original", "🚫", null),
+    GRAYSCALE("Grayscale", "🖤", ColorMatrix().apply { setToSaturation(0f) }),
+    SEPIA("Sepia", "🟤", ColorMatrix(floatArrayOf(
+        0.393f, 0.769f, 0.189f, 0f, 0f,
+        0.349f, 0.686f, 0.168f, 0f, 0f,
+        0.272f, 0.534f, 0.131f, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    ))),
+    COOL("Cool", "🧊", ColorMatrix(floatArrayOf(
+        0.9f, 0f, 0f, 0f, 0f,
+        0f, 1f, 0f, 0f, 0f,
+        0f, 0f, 1.15f, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    ))),
+    WARM("Warm", "🔥", ColorMatrix(floatArrayOf(
+        1.12f, 0f, 0f, 0f, 0f,
+        0f, 1.02f, 0f, 0f, 0f,
+        0f, 0f, 0.85f, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    ))),
+    NOIR("Noir", "🎩", ColorMatrix(floatArrayOf(
+        0.45f, 0.5f, 0.35f, 0f, -0.05f,
+        0.45f, 0.5f, 0.35f, 0f, -0.05f,
+        0.45f, 0.5f, 0.35f, 0f, -0.05f,
+        0f, 0f, 0f, 1f, 0f
+    ))),
+    VIVID("Vivid", "✨", ColorMatrix().apply { setToSaturation(1.6f) }),
+    FADE("Faded", "🌫️", ColorMatrix(floatArrayOf(
+        0.85f, 0f, 0f, 0f, 0.09f,
+        0f, 0.85f, 0f, 0f, 0.09f,
+        0f, 0f, 0.85f, 0f, 0.09f,
+        0f, 0f, 0f, 1f, 0f
+    )))
+}
 
 data class StorySticker(
     val label: String,
@@ -60,7 +120,8 @@ data class StoryTemplate(
     val shape: StoryBadgeShape,
     val highlightMode: TextHighlightMode,
     val accentHex: String,
-    val defaultCaption: String
+    val defaultCaption: String,
+    val category: String = "Popular"
 )
 
 enum class StoryBadgeShape(val displayName: String, val icon: String) {
@@ -71,7 +132,12 @@ enum class StoryBadgeShape(val displayName: String, val icon: String) {
     POLYGON("Polygon Tag", "⚡"),
     DOUBLE_FRAME("Double Glow Frame", "🖼️"),
     SPEECH_BUBBLE("Speech Bubble", "💬"),
-    MINIMAL("Floating Text", "✨")
+    MINIMAL("Floating Text", "✨"),
+    HEART("Heart Shape", "❤️"),
+    STAR("Star Burst", "⭐"),
+    RIBBON("Winner Ribbon", "🎀"),
+    CLOUD("Soft Cloud", "☁️"),
+    DIAMOND("Diamond Gem", "💎")
 }
 
 enum class TextHighlightMode(val displayName: String) {
@@ -81,9 +147,58 @@ enum class TextHighlightMode(val displayName: String) {
     NEON_OUTLINE("Glow Outline")
 }
 
+// ── Custom Decorative Story Shapes ──────────────────────────────────────────
+val HeartBadgeShape: Shape = GenericShape { size, _ ->
+    val w = size.width
+    val h = size.height
+    moveTo(w * 0.5f, h * 0.35f)
+    cubicTo(w * 0.4f, h * 0.05f, w * 0.1f, h * 0.05f, w * 0.1f, h * 0.3f)
+    cubicTo(w * 0.1f, h * 0.55f, w * 0.35f, h * 0.72f, w * 0.5f, h * 0.92f)
+    cubicTo(w * 0.65f, h * 0.72f, w * 0.9f, h * 0.55f, w * 0.9f, h * 0.3f)
+    cubicTo(w * 0.9f, h * 0.05f, w * 0.6f, h * 0.05f, w * 0.5f, h * 0.35f)
+    close()
+}
+
+val StarBadgeShape: Shape = GenericShape { size, _ ->
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val outer = size.width / 2f
+    val inner = outer * 0.45f
+    var first = true
+    for (i in 0 until 10) {
+        val r = if (i % 2 == 0) outer else inner
+        val angle = -kotlin.math.PI / 2 + i * kotlin.math.PI / 5
+        val x = cx + (r * kotlin.math.cos(angle)).toFloat()
+        val y = cy + (r * kotlin.math.sin(angle)).toFloat()
+        if (first) { moveTo(x, y); first = false } else lineTo(x, y)
+    }
+    close()
+}
+
+val CloudBadgeShape: Shape = GenericShape { size, _ ->
+    val w = size.width
+    val h = size.height
+    moveTo(w * 0.2f, h * 0.75f)
+    lineTo(w * 0.8f, h * 0.75f)
+    cubicTo(w * 1.02f, h * 0.75f, w * 1.0f, h * 0.45f, w * 0.85f, h * 0.42f)
+    cubicTo(w * 0.9f, h * 0.16f, w * 0.58f, h * 0.08f, w * 0.55f, h * 0.28f)
+    cubicTo(w * 0.4f, h * 0.0f, w * 0.08f, h * 0.18f, w * 0.18f, h * 0.42f)
+    cubicTo(w * 0.0f, h * 0.46f, w * 0.0f, h * 0.75f, w * 0.2f, h * 0.75f)
+    close()
+}
+
+val DiamondBadgeShape: Shape = GenericShape { size, _ ->
+    moveTo(size.width / 2f, 0f)
+    lineTo(size.width, size.height / 2f)
+    lineTo(size.width / 2f, size.height)
+    lineTo(0f, size.height / 2f)
+    close()
+}
+
 enum class StoryEditorTab(val title: String, val icon: String) {
     NONE("Canvas View", "👁️"),
     TEMPLATES("Templates", "🎨"),
+    PHOTO("Photo BG", "📷"),
     TEXT("Typography", "T"),
     STICKERS("Badges", "⭐"),
     SHAPES("Shapes", "💬"),
@@ -136,18 +251,42 @@ fun CreateStoryScreen(
             StorySticker("💧 HYDRATED GOAL", "#00E5FF", "Habits"),
             StorySticker("🏃 MORNING RUN", "#FFD23D", "Habits"),
             StorySticker("🧠 DEEP FOCUS", "#EC4899", "Habits"),
+            StorySticker("🏋️ GYM CRUSHED", "#2FBF71", "Habits"),
+            StorySticker("📚 BOOK DONE", "#FFD23D", "Habits"),
+            StorySticker("💻 DEEP WORK", "#00E5FF", "Habits"),
 
             // Fails
             StorySticker("📖 FAIL STORY", "#FF3D71", "Fails"),
             StorySticker("🛌 OVERSLEPT", "#EC4899", "Fails"),
             StorySticker("☕ COFFEE FIRST", "#FF8A3D", "Fails"),
             StorySticker("🧟 ZOMBIE MODE", "#A855F7", "Fails"),
-            StorySticker("💀 BEAT BY ALARM", "#FF3D71", "Fails")
+            StorySticker("💀 BEAT BY ALARM", "#FF3D71", "Fails"),
+            StorySticker("🥶 SLEPT THROUGH", "#B388FF", "Fails"),
+
+            // Motivation
+            StorySticker("🎯 GOAL CRUSHED", "#00FF94", "Motivation"),
+            StorySticker("🌟 SHINE BRIGHT", "#FFD23D", "Motivation"),
+            StorySticker("💃 VICTORY LAP", "#FF8A3D", "Motivation"),
+            StorySticker("🙏 GRATEFUL", "#00E5FF", "Motivation"),
+            StorySticker("👑 KING ENERGY", "#FFD23D", "Motivation"),
+
+            // Weekend
+            StorySticker("🎉 WEEKEND MODE", "#FF8A3D", "Weekend"),
+            StorySticker("🦉 NIGHT OWL", "#B388FF", "Weekend"),
+            StorySticker("🏋️ REST DAY", "#2FBF71", "Weekend"),
+            StorySticker("🧘 CALM MIND", "#A855F7", "Weekend"),
+            StorySticker("📵 PHONE DETOX", "#EC4899", "Weekend")
         )
     }
 
     val quickEmojis = remember {
-        listOf("🔥", "⚡", "🌅", "🏆", "⏰", "💪", "🚀", "💯", "☕", "👑", "🎯", "🌟", "💥", "🎉", "😴", "🛌", "💀", "😂")
+        listOf(
+            "🔥", "⚡", "🌅", "🏆", "⏰", "💪", "🚀", "💯", "☕", "👑",
+            "🎯", "🌟", "💥", "🎉", "😴", "🛌", "💀", "😂",
+            "❤️", "🧠", "📚", "🧘", "🏋️", "🙏", "💧", "🦉",
+            "📵", "💃", "🎵", "🌈", "✨", "😎", "🍀", "🎂",
+            "🐐", "💜"
+        )
     }
 
     // ── 16 Vibrant Color Swatches ──────────────────────────────────────────
@@ -169,13 +308,20 @@ fun CreateStoryScreen(
             GradientPreset("Dark Sunset Flame", "#1A0500", "#3D0F00"),
             GradientPreset("Vaporwave Dark", "#180018", "#3B003B"),
             GradientPreset("Carbon Gold", "#121000", "#332B00"),
-            GradientPreset("Blood Moon", "#1A0005", "#3B000B")
+            GradientPreset("Blood Moon", "#1A0005", "#3B000B"),
+            GradientPreset("Aurora Teal", "#00131A", "#007A6E", middleHex = "#003D4D"),
+            GradientPreset("Sunset Peach", "#2A0500", "#E2543A", middleHex = "#7A1E00"),
+            GradientPreset("Ocean Royal", "#020617", "#1E4FA8", middleHex = "#0F2A5C"),
+            GradientPreset("Forest Glow", "#041A10", "#2FBF71", middleHex = "#0B4D2C"),
+            GradientPreset("Royal Violet", "#0B0214", "#6D28D9", middleHex = "#2A0A4A"),
+            GradientPreset("Cherry Punch", "#1A0000", "#B91C1C", middleHex = "#4A000D")
         )
     }
 
-    // ── 6 Pre-Designed Story Templates ──────────────────────────────────────
+    // ── 17 Pre-Designed Story Templates (Categorized) ────────────────────────
     val templates = remember {
         listOf(
+            // ── WAKE ──
             StoryTemplate(
                 id = "5am_club",
                 name = "5:00 AM Club",
@@ -185,8 +331,47 @@ fun CreateStoryScreen(
                 shape = StoryBadgeShape.CAPSULE,
                 highlightMode = TextHighlightMode.DARK_GLASS,
                 accentHex = "#00FF94",
-                defaultCaption = "RISE & SHINE - UNLOCK YOUR POTENTIAL ⚡"
+                defaultCaption = "RISE & SHINE - UNLOCK YOUR POTENTIAL ⚡",
+                category = "Wake"
             ),
+            StoryTemplate(
+                id = "early_bird",
+                name = "Early Bird",
+                icon = "🐦",
+                sticker = StorySticker("⏰ EARLY BIRD", "#00E5FF", "Wake Up"),
+                gradient = GradientPreset("Aurora Teal", "#00131A", "#007A6E", middleHex = "#003D4D"),
+                shape = StoryBadgeShape.CLOUD,
+                highlightMode = TextHighlightMode.NEON_OUTLINE,
+                accentHex = "#00E5FF",
+                defaultCaption = "EARLY BIRD WINS THE DAY 🐦 SUNRISE MODE",
+                category = "Wake"
+            ),
+            StoryTemplate(
+                id = "alarm_smashed",
+                name = "Alarm Smashed",
+                icon = "⚡",
+                sticker = StorySticker("⚡ ALARM SMASHED", "#FFD23D", "Wake Up"),
+                gradient = GradientPreset("Sunset Peach", "#2A0500", "#E2543A", middleHex = "#7A1E00"),
+                shape = StoryBadgeShape.STAR,
+                highlightMode = TextHighlightMode.ACCENT_SOLID,
+                accentHex = "#FFD23D",
+                defaultCaption = "DESTROYED MY ALARM ⚡ ZERO HESITATION",
+                category = "Wake"
+            ),
+            StoryTemplate(
+                id = "no_snooze",
+                name = "No Snooze",
+                icon = "🔔",
+                sticker = StorySticker("🔔 NO SNOOZE", "#FF8A3D", "Wake Up"),
+                gradient = GradientPreset("Carbon Gold", "#121000", "#332B00"),
+                shape = StoryBadgeShape.DOUBLE_FRAME,
+                highlightMode = TextHighlightMode.ACCENT_SOLID,
+                accentHex = "#FF8A3D",
+                defaultCaption = "SLEPT LIKE A CHAMPION 🔔 NO SNOOZE EVER",
+                category = "Wake"
+            ),
+
+            // ── STREAK ──
             StoryTemplate(
                 id = "streak_14",
                 name = "14-Day Streak",
@@ -196,18 +381,8 @@ fun CreateStoryScreen(
                 shape = StoryBadgeShape.DOUBLE_FRAME,
                 highlightMode = TextHighlightMode.ACCENT_SOLID,
                 accentHex = "#FFD23D",
-                defaultCaption = "UNSTOPPABLE MOMENTUM 🔥 14 DAYS STRONG"
-            ),
-            StoryTemplate(
-                id = "routine",
-                name = "Morning Routine",
-                icon = "💪",
-                sticker = StorySticker("💪 HABIT DONE", "#00E5FF", "Habits"),
-                gradient = GradientPreset("Deep Space Cyan", "#00141D", "#002B3D"),
-                shape = StoryBadgeShape.CYBER_TAG,
-                highlightMode = TextHighlightMode.NEON_OUTLINE,
-                accentHex = "#00E5FF",
-                defaultCaption = "MORNING ROUTINE SMASHED 💪 READY TO CONQUER"
+                defaultCaption = "UNSTOPPABLE MOMENTUM 🔥 14 DAYS STRONG",
+                category = "Streak"
             ),
             StoryTemplate(
                 id = "record",
@@ -218,18 +393,58 @@ fun CreateStoryScreen(
                 shape = StoryBadgeShape.POLYGON,
                 highlightMode = TextHighlightMode.ACCENT_SOLID,
                 accentHex = "#FF8A3D",
-                defaultCaption = "NEW PERSONAL RECORD SET 🏆 LEVEL UP!"
+                defaultCaption = "NEW PERSONAL RECORD SET 🏆 LEVEL UP!",
+                category = "Streak"
             ),
             StoryTemplate(
-                id = "fail",
-                name = "Fail Story",
-                icon = "📖",
-                sticker = StorySticker("📖 FAIL STORY", "#FF3D71", "Fails"),
-                gradient = GradientPreset("Blood Moon", "#1A0005", "#3B000B"),
-                shape = StoryBadgeShape.SPEECH_BUBBLE,
+                id = "century",
+                name = "Century 100",
+                icon = "💯",
+                sticker = StorySticker("💯 100% STREAK", "#00E5FF", "Streaks"),
+                gradient = GradientPreset("Ocean Royal", "#020617", "#1E4FA8", middleHex = "#0F2A5C"),
+                shape = StoryBadgeShape.ROUNDED,
                 highlightMode = TextHighlightMode.NEON_OUTLINE,
-                accentHex = "#FF3D71",
-                defaultCaption = "OVERSLEPT TODAY 🛌 BOUNCING BACK TOMORROW"
+                accentHex = "#00E5FF",
+                defaultCaption = "CENTURY CLUB 💯 100 DAYS UNBROKEN",
+                category = "Streak"
+            ),
+
+            // ── HABIT ──
+            StoryTemplate(
+                id = "routine",
+                name = "Morning Routine",
+                icon = "💪",
+                sticker = StorySticker("💪 HABIT DONE", "#00E5FF", "Habits"),
+                gradient = GradientPreset("Deep Space Cyan", "#00141D", "#002B3D"),
+                shape = StoryBadgeShape.CYBER_TAG,
+                highlightMode = TextHighlightMode.NEON_OUTLINE,
+                accentHex = "#00E5FF",
+                defaultCaption = "MORNING ROUTINE SMASHED 💪 READY TO CONQUER",
+                category = "Habit"
+            ),
+            StoryTemplate(
+                id = "hydrated",
+                name = "Hydration Goal",
+                icon = "💧",
+                sticker = StorySticker("💧 HYDRATED GOAL", "#00E5FF", "Habits"),
+                gradient = GradientPreset("Ocean Royal", "#020617", "#1E4FA8", middleHex = "#0F2A5C"),
+                shape = StoryBadgeShape.ROUNDED,
+                highlightMode = TextHighlightMode.NEON_OUTLINE,
+                accentHex = "#00E5FF",
+                defaultCaption = "8 GLASSES DONE 💧 STAY HYDRATED, STAY SHARP",
+                category = "Habit"
+            ),
+            StoryTemplate(
+                id = "workout",
+                name = "Beast Mode",
+                icon = "🏋️",
+                sticker = StorySticker("🏋️ GYM CRUSHED", "#2FBF71", "Habits"),
+                gradient = GradientPreset("Forest Glow", "#041A10", "#2FBF71", middleHex = "#0B4D2C"),
+                shape = StoryBadgeShape.POLYGON,
+                highlightMode = TextHighlightMode.ACCENT_SOLID,
+                accentHex = "#2FBF71",
+                defaultCaption = "BEAST MODE ACTIVATED 🏋️ 100% PUSH TODAY",
+                category = "Habit"
             ),
             StoryTemplate(
                 id = "focus",
@@ -240,10 +455,90 @@ fun CreateStoryScreen(
                 shape = StoryBadgeShape.BANNER,
                 highlightMode = TextHighlightMode.DARK_GLASS,
                 accentHex = "#A855F7",
-                defaultCaption = "IN THE ZONE 🧠 100% FOCUS MODE"
+                defaultCaption = "IN THE ZONE 🧠 100% FOCUS MODE",
+                category = "Habit"
+            ),
+            StoryTemplate(
+                id = "reading",
+                name = "Book Worm",
+                icon = "📚",
+                sticker = StorySticker("📚 BOOK DONE", "#FFD23D", "Habits"),
+                gradient = GradientPreset("Carbon Gold", "#121000", "#332B00"),
+                shape = StoryBadgeShape.BANNER,
+                highlightMode = TextHighlightMode.CLEAN,
+                accentHex = "#FFD23D",
+                defaultCaption = "CHAPTER COMPLETED 📚 KNOWLEDGE LEVEL UP",
+                category = "Habit"
+            ),
+
+            // ── MOTIVATION ──
+            StoryTemplate(
+                id = "meditation",
+                name = "Zen Calm",
+                icon = "🧘",
+                sticker = StorySticker("🧘 CALM MIND", "#A855F7", "Weekend"),
+                gradient = GradientPreset("Royal Violet", "#0B0214", "#6D28D9", middleHex = "#2A0A4A"),
+                shape = StoryBadgeShape.CLOUD,
+                highlightMode = TextHighlightMode.DARK_GLASS,
+                accentHex = "#A855F7",
+                defaultCaption = "BREATHE IN. BREATHE OUT 🧘 PEACE OVERLOAD",
+                category = "Motivation"
+            ),
+            StoryTemplate(
+                id = "gratitude",
+                name = "Gratitude Mode",
+                icon = "🙏",
+                sticker = StorySticker("🙏 GRATEFUL", "#00E5FF", "Motivation"),
+                gradient = GradientPreset("Aurora Teal", "#00131A", "#007A6E", middleHex = "#003D4D"),
+                shape = StoryBadgeShape.SPEECH_BUBBLE,
+                highlightMode = TextHighlightMode.CLEAN,
+                accentHex = "#00FF94",
+                defaultCaption = "THANKFUL FOR TODAY 🙏 GROWING EVERY DAY",
+                category = "Motivation"
+            ),
+            StoryTemplate(
+                id = "nightowl",
+                name = "Night Owl",
+                icon = "🦉",
+                sticker = StorySticker("🦉 NIGHT OWL", "#B388FF", "Weekend"),
+                gradient = GradientPreset("Midnight Purple", "#11001C", "#2D0036"),
+                shape = StoryBadgeShape.STAR,
+                highlightMode = TextHighlightMode.NEON_OUTLINE,
+                accentHex = "#B388FF",
+                defaultCaption = "PRODUCTIVE AFTER DARK 🦉 NO SLEEP TIL DONE",
+                category = "Motivation"
+            ),
+
+            // ── WEEKEND ──
+            StoryTemplate(
+                id = "weekend",
+                name = "Weekend Vibes",
+                icon = "🎉",
+                sticker = StorySticker("🎉 WEEKEND MODE", "#FF8A3D", "Weekend"),
+                gradient = GradientPreset("Sunset Peach", "#2A0500", "#E2543A", middleHex = "#7A1E00"),
+                shape = StoryBadgeShape.DOUBLE_FRAME,
+                highlightMode = TextHighlightMode.ACCENT_SOLID,
+                accentHex = "#FF8A3D",
+                defaultCaption = "WEEKEND ENERGY LOADED 🎉 LET'S GO!",
+                category = "Weekend"
+            ),
+            StoryTemplate(
+                id = "victory",
+                name = "Victory Dance",
+                icon = "💃",
+                sticker = StorySticker("💃 VICTORY LAP", "#FF8A3D", "Motivation"),
+                gradient = GradientPreset("Cherry Punch", "#1A0000", "#B91C1C", middleHex = "#4A000D"),
+                shape = StoryBadgeShape.HEART,
+                highlightMode = TextHighlightMode.ACCENT_SOLID,
+                accentHex = "#FF3D71",
+                defaultCaption = "MISSION COMPLETE 💃 VICTORY DANCE TIME",
+                category = "Weekend"
             )
         )
     }
+
+    // ── Template Filter Categories ──────────────────────────────────────────
+    val templateCategories = listOf("All", "Wake", "Streak", "Habit", "Motivation", "Weekend")
 
     // ── Editor State Variables ──────────────────────────────────────────────
     var captionText by remember { mutableStateOf("") }
@@ -254,9 +549,41 @@ fun CreateStoryScreen(
     var textHighlight by remember { mutableStateOf(TextHighlightMode.CLEAN) }
     var textAlign by remember { mutableStateOf(TextAlign.Center) }
     var activeTab by remember { mutableStateOf(StoryEditorTab.TEXT) }
+    val editorSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedStickerCategory by remember { mutableStateOf("Wake Up") }
+    var selectedTemplateCategory by remember { mutableStateOf("All") }
+    var captionFontSize by remember { mutableStateOf(26f) }
     var isPosting by remember { mutableStateOf(false) }
     var selectedAccentColorHex by remember { mutableStateOf("#00FF94") }
+
+    // ── Photo Background State ────────────────────────────────────────
+    var photoBackgroundBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var photoOverlayAlpha by remember { mutableStateOf(0.45f) }
+    var usePhotoBackground by remember { mutableStateOf(true) }
+    var selectedPhotoFilter by remember { mutableStateOf(StoryPhotoFilter.NONE) }
+    var photoBrightness by remember { mutableStateOf(0f) }   // -0.5f..0.5f add to RGB
+    var photoContrast by remember { mutableStateOf(1f) }     // 0.5f..1.8f scale from gray mid
+    var photoVignette by remember { mutableStateOf(0f) }     // 0f..0.9f edge darkening
+    var photoBlur by remember { mutableStateOf(0.dp) }       // 0..24.dp gaussian blur
+
+    // ── Drag-to-Reposition State (canvas elements) ───────────────
+    var badgeDragOffset by remember { mutableStateOf(Offset.Zero) }
+    var badgeScale by remember { mutableStateOf(1f) }          // 0.5x..2.5x pinch zoom
+    var badgeRotation by remember { mutableStateOf(0f) }       // degrees, free rotation
+    var captionDragOffset by remember { mutableStateOf(Offset.Zero) }
+    var captionScale by remember { mutableStateOf(1f) }        // 0.5x..2.5x pinch zoom
+    var captionRotation by remember { mutableStateOf(0f) }     // degrees, free rotation
+
+    val photoBitmap = remember(photoBackgroundBytes) {
+        photoBackgroundBytes?.decodeToImageBitmap()
+    }
+
+    val launchPhotoPicker = rememberStoryPhotoPickerLauncher { bytes ->
+        if (bytes != null) {
+            photoBackgroundBytes = bytes
+            usePhotoBackground = true
+        }
+    }
 
     fun parseColor(hex: String): Color {
         return try {
@@ -296,6 +623,31 @@ fun CreateStoryScreen(
         parseColor(selectedAccentColorHex)
     }
 
+    // Combined photo ColorFilter: preset matrix + brightness + contrast
+    val photoColorFilter: ColorFilter? = remember(
+        selectedPhotoFilter, photoBrightness, photoContrast
+    ) {
+        val presetMatrix = selectedPhotoFilter.matrix
+        val hasAdjustments = photoBrightness != 0f || photoContrast != 1f
+        if (presetMatrix == null && !hasAdjustments) return@remember null
+
+        fun scaleRows(m: ColorMatrix, rgbScale: Float, offset: Float) = ColorMatrix(floatArrayOf(
+            m[0, 0] * rgbScale, m[0, 1] * rgbScale, m[0, 2] * rgbScale, m[0, 3], m[0, 4] + offset,
+            m[1, 0] * rgbScale, m[1, 1] * rgbScale, m[1, 2] * rgbScale, m[1, 3], m[1, 4] + offset,
+            m[2, 0] * rgbScale, m[2, 1] * rgbScale, m[2, 2] * rgbScale, m[2, 3], m[2, 4] + offset,
+            m[3, 0], m[3, 1], m[3, 2], m[3, 3], m[3, 4]
+        ))
+
+        // Start from identity or the preset
+        val base = presetMatrix ?: ColorMatrix()
+
+        // Contrast: scale around mid-gray (0.5). Brightness: additive offset.
+        val contrastMatrix = scaleRows(base, photoContrast, (1f - photoContrast) * 0.5f)
+        val brightnessMatrix = scaleRows(contrastMatrix, 1f, photoBrightness)
+
+        ColorFilter.colorMatrix(brightnessMatrix)
+    }
+
     fun getBadgeShape(badgeShape: StoryBadgeShape): Shape {
         return when (badgeShape) {
             StoryBadgeShape.CAPSULE -> CircleShape
@@ -306,6 +658,11 @@ fun CreateStoryScreen(
             StoryBadgeShape.DOUBLE_FRAME -> RoundedCornerShape(16.dp)
             StoryBadgeShape.SPEECH_BUBBLE -> RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 4.dp, bottomEnd = 20.dp)
             StoryBadgeShape.MINIMAL -> RoundedCornerShape(0.dp)
+            StoryBadgeShape.HEART -> HeartBadgeShape
+            StoryBadgeShape.STAR -> StarBadgeShape
+            StoryBadgeShape.RIBBON -> CutCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp)
+            StoryBadgeShape.CLOUD -> CloudBadgeShape
+            StoryBadgeShape.DIAMOND -> DiamondBadgeShape
         }
     }
 
@@ -324,6 +681,69 @@ fun CreateStoryScreen(
                 }
                 .padding(20.dp)
         ) {
+            // ── Photo Background Layer (under gradient overlay) ────────────
+            if (photoBitmap != null && usePhotoBackground) {
+                Image(
+                    bitmap = photoBitmap,
+                    contentDescription = "Story photo background",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Scale up slightly so gaussian blur doesn't reveal soft edges
+                        .scale(1f + (photoBlur.value / 90f))
+                        .blur(photoBlur),
+                    contentScale = ContentScale.Crop,
+                    colorFilter = photoColorFilter
+                )
+                // Gradient scrim so text stays readable over the photo
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    parseColor(selectedGradient.startHex).copy(alpha = photoOverlayAlpha),
+                                    parseColor(selectedGradient.endHex).copy(alpha = photoOverlayAlpha)
+                                )
+                            )
+                        )
+                )
+                // Vignette: radial darkening toward the edges for a cinematic look
+                if (photoVignette > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0f),
+                                        Color.Black.copy(alpha = 0f),
+                                        Color.Black.copy(alpha = photoVignette)
+                                    ),
+                                    radius = 900f
+                                )
+                            )
+                    )
+                }
+            }
+
+            // Decorative Glow Orbs (Modern Depth Effect)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(170.dp)
+                    .offset(x = 70.dp, y = (-50).dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = 0.16f))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .size(150.dp)
+                    .offset(x = (-60).dp, y = 55.dp)
+                    .clip(CircleShape)
+                    .background(stickerColor.copy(alpha = 0.12f))
+            )
+
             // Story Header (Top Left User Avatar & Username)
             Row(
                 modifier = Modifier
@@ -361,16 +781,24 @@ fun CreateStoryScreen(
                 }
             }
 
-            // Canvas Center Content (Badge + Dynamic Styled Caption)
-            Column(
+            // Canvas Center Content — Badge, draggable + pinch-zoom/rotate
+            Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(22.dp)
+                    .offset { IntOffset(badgeDragOffset.x.roundToInt(), badgeDragOffset.y.roundToInt()) }
+                    .graphicsLayer {
+                        scaleX = badgeScale
+                        scaleY = badgeScale
+                        rotationZ = badgeRotation
+                    }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, rotation ->
+                            badgeDragOffset += pan
+                            badgeScale = (badgeScale * zoom).coerceIn(0.5f, 2.5f)
+                            badgeRotation += rotation
+                        }
+                    }
             ) {
-                // Sticker Badge Container
                 if (selectedShape == StoryBadgeShape.MINIMAL) {
                     Text(
                         text = selectedSticker.label,
@@ -398,7 +826,29 @@ fun CreateStoryScreen(
                         )
                     }
                 }
+            }
 
+            // Canvas Center Content — Caption, draggable + tap-to-edit + pinch-zoom/rotate
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset { IntOffset(captionDragOffset.x.roundToInt(), captionDragOffset.y.roundToInt()) }
+                    .graphicsLayer {
+                        scaleX = captionScale
+                        scaleY = captionScale
+                        rotationZ = captionRotation
+                    }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { centroid, pan, zoom, rotation ->
+                            captionDragOffset += pan
+                            captionScale = (captionScale * zoom).coerceIn(0.5f, 2.5f)
+                            captionRotation += rotation
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = { activeTab = StoryEditorTab.TEXT })
+                    }
+            ) {
                 // Styled Text Caption
                 val textToDisplay = if (captionText.isBlank()) {
                     "NO SNOOZE, NO RETREAT 🔥"
@@ -434,17 +884,17 @@ fun CreateStoryScreen(
                 }
 
                 Box(
-                    modifier = textBgModifier.clickable { activeTab = StoryEditorTab.TEXT },
+                    modifier = textBgModifier,
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = textToDisplay,
                         color = textColor,
-                        fontSize = 26.sp,
+                        fontSize = captionFontSize.sp,
                         fontWeight = FontWeight.ExtraBold,
                         fontFamily = selectedFont.family,
                         textAlign = textAlign,
-                        lineHeight = 32.sp
+                        lineHeight = (captionFontSize + 6).sp
                     )
                 }
             }
@@ -511,6 +961,7 @@ fun CreateStoryScreen(
             ) {
                 listOf(
                     StoryEditorTab.TEMPLATES,
+                    StoryEditorTab.PHOTO,
                     StoryEditorTab.TEXT,
                     StoryEditorTab.STICKERS,
                     StoryEditorTab.SHAPES,
@@ -677,44 +1128,28 @@ fun CreateStoryScreen(
             }
         }
 
-        // ── 5. High-Tech Dark Control Drawer Sheet ───────────────────────────
-        AnimatedVisibility(
-            visible = activeTab != StoryEditorTab.NONE,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                color = Color(0xFF0C101D).copy(alpha = 0.95f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+        // ── 5. Real Material 3 Modal Bottom Sheet ────────────────────────────
+        if (activeTab != StoryEditorTab.NONE) {
+            ModalBottomSheet(
+                onDismissRequest = { activeTab = StoryEditorTab.NONE },
+                sheetState = editorSheetState,
+                containerColor = Color(0xFF0C101D),
+                tonalElevation = 0.dp
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Drag Handle
-                    Box(
-                        modifier = Modifier
-                            .width(40.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color.White.copy(alpha = 0.3f))
-                            .align(Alignment.CenterHorizontally)
-                            .clickable { activeTab = StoryEditorTab.NONE }
-                    )
-
                     // Drawer Filter Chips Bar
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(listOf(
                             StoryEditorTab.TEMPLATES,
+                            StoryEditorTab.PHOTO,
                             StoryEditorTab.TEXT,
                             StoryEditorTab.STICKERS,
                             StoryEditorTab.SHAPES,
@@ -753,43 +1188,470 @@ fun CreateStoryScreen(
                     // Drawer Dynamic Tool Panel
                     Crossfade(targetState = activeTab) { tab ->
                         when (tab) {
-                            StoryEditorTab.TEMPLATES -> {
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(
-                                        text = "1-TAP PRESET STORY TEMPLATES (6 STYLES)",
-                                        color = Color.White.copy(alpha = 0.6f),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = interFamily
-                                    )
-                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        items(templates) { template ->
-                                            val tAccent = parseColor(template.accentHex)
+                            StoryEditorTab.PHOTO -> {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "PHOTO BACKGROUND",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = interFamily
+                                        )
+
+                                        // One-tap reset: filter, brightness, contrast, overlay
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color.White.copy(alpha = 0.08f))
+                                                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    selectedPhotoFilter = StoryPhotoFilter.NONE
+                                                    photoBrightness = 0f
+                                                    photoContrast = 1f
+                                                    photoOverlayAlpha = 0.45f
+                                                    photoVignette = 0f
+                                                    photoBlur = 0.dp
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(text = "🔄", fontSize = 11.sp)
+                                            Text(
+                                                text = "Reset",
+                                                color = Color.White.copy(alpha = 0.85f),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = interFamily
+                                            )
+                                        }
+                                    }
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        // Pick from Gallery
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(accentColor.copy(alpha = 0.18f))
+                                                .border(1.5.dp, accentColor, RoundedCornerShape(14.dp))
+                                                .clickable { launchPhotoPicker() }
+                                                .padding(vertical = 12.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Text(text = "📷", fontSize = 14.sp)
+                                                Text(
+                                                    text = "Pick Photo",
+                                                    color = accentColor,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = interFamily
+                                                )
+                                            }
+                                        }
+
+                                        // Remove Photo (only when one is set)
+                                        if (photoBackgroundBytes != null) {
                                             Box(
                                                 modifier = Modifier
-                                                    .width(130.dp)
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(14.dp))
+                                                    .background(Color.White.copy(alpha = 0.08f))
+                                                    .border(1.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+                                                    .clickable {
+                                                        photoBackgroundBytes = null
+                                                        usePhotoBackground = false
+                                                    }
+                                                    .padding(vertical = 12.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Text(text = "🗑️", fontSize = 14.sp)
+                                                    Text(
+                                                        text = "Remove",
+                                                        color = Color.White.copy(alpha = 0.85f),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = interFamily
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    val currentPhotoBitmap = photoBitmap
+                                    if (currentPhotoBitmap != null) {
+                                        // Live thumbnail: current photo with filters applied
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(64.dp)
+                                                    .clip(RoundedCornerShape(14.dp))
+                                                    .border(1.5.dp, accentColor.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+                                            ) {
+                                                Image(
+                                                    bitmap = currentPhotoBitmap,
+                                                    contentDescription = "Selected photo thumbnail",
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop,
+                                                    colorFilter = photoColorFilter
+                                                )
+                                                if (photoVignette > 0f) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxSize()
+                                                            .background(
+                                                                Brush.radialGradient(
+                                                                    colors = listOf(
+                                                                        Color.Black.copy(alpha = 0f),
+                                                                        Color.Black.copy(alpha = 0f),
+                                                                        Color.Black.copy(alpha = photoVignette)
+                                                                    ),
+                                                                    radius = 200f
+                                                                )
+                                                            )
+                                                    )
+                                                }
+                                                if (!usePhotoBackground) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxSize()
+                                                            .background(Color.Black.copy(alpha = 0.6f)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(text = "🚫", fontSize = 18.sp)
+                                                    }
+                                                }
+                                            }
+
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(
+                                                    text = "Current photo",
+                                                    color = Color.White,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = interFamily
+                                                )
+                                                Text(
+                                                    text = "${selectedPhotoFilter.displayName} • Bright ${(photoBrightness * 100).toInt()}% • Contrast ${(photoContrast * 100).toInt()}%" +
+                                                        if (photoBlur > 0.dp) " • Blur ${photoBlur.value.toInt()}dp" else "",
+                                                    color = Color.White.copy(alpha = 0.55f),
+                                                    fontSize = 10.sp,
+                                                    fontFamily = interFamily
+                                                )
+                                            }
+                                        }
+
+                                        // Toggle photo on/off without losing the pick
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Show photo background",
+                                                color = Color.White.copy(alpha = 0.85f),
+                                                fontSize = 12.sp,
+                                                fontFamily = interFamily
+                                            )
+                                            Switch(
+                                                checked = usePhotoBackground,
+                                                onCheckedChange = { usePhotoBackground = it },
+                                                colors = SwitchDefaults.colors(
+                                                    checkedThumbColor = Color.Black,
+                                                    checkedTrackColor = accentColor,
+                                                    uncheckedThumbColor = Color.White,
+                                                    uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+                                                )
+                                            )
+                                        }
+
+                                        // Overlay darkness slider
+                                        Text(
+                                            text = "OVERLAY DARKNESS • ${(photoOverlayAlpha * 100).toInt()}%",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = interFamily
+                                        )
+                                        Slider(
+                                            value = photoOverlayAlpha,
+                                            onValueChange = { photoOverlayAlpha = it },
+                                            valueRange = 0.1f..0.9f,
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = accentColor,
+                                                activeTrackColor = accentColor,
+                                                inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                            )
+                                        )
+
+                                        Text(
+                                            text = "Tip: the gradient tint keeps your caption readable on any photo ✨",
+                                            color = Color.White.copy(alpha = 0.45f),
+                                            fontSize = 10.sp,
+                                            fontFamily = interFamily
+                                        )
+                                    }
+
+                                    // ── Photo Filters (only when a photo is set) ──
+                                    if (photoBackgroundBytes != null) {
+                                        Text(
+                                            text = "FILTERS",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = interFamily
+                                        )
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            items(StoryPhotoFilter.values().toList()) { filter ->
+                                                val isSelected = selectedPhotoFilter == filter
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(46.dp)
+                                                            .clip(RoundedCornerShape(12.dp))
+                                                            .background(
+                                                                Brush.verticalGradient(
+                                                                    listOf(
+                                                                        parseColor(selectedGradient.startHex),
+                                                                        parseColor(selectedGradient.endHex)
+                                                                    )
+                                                                )
+                                                            )
+                                                            .border(
+                                                                if (isSelected) 2.5.dp else 1.dp,
+                                                                if (isSelected) accentColor else Color.White.copy(alpha = 0.25f),
+                                                                RoundedCornerShape(12.dp)
+                                                            )
+                                                            .clickable { selectedPhotoFilter = filter },
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(text = filter.icon, fontSize = 18.sp)
+                                                    }
+                                                    Text(
+                                                        text = filter.displayName,
+                                                        color = if (isSelected) accentColor else Color.White.copy(alpha = 0.6f),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                        fontFamily = interFamily
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // ── Brightness & Contrast ──
+                                        Text(
+                                            text = "BRIGHTNESS • ${if (photoBrightness >= 0) "+" else ""}${(photoBrightness * 100).toInt()}%",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = interFamily
+                                        )
+                                        Slider(
+                                            value = photoBrightness,
+                                            onValueChange = { photoBrightness = it },
+                                            valueRange = -0.5f..0.5f,
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = accentColor,
+                                                activeTrackColor = accentColor,
+                                                inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                            )
+                                        )
+
+                                        Text(
+                                            text = "CONTRAST • ${(photoContrast * 100).toInt()}%",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = interFamily
+                                        )
+                                        Slider(
+                                            value = photoContrast,
+                                            onValueChange = { photoContrast = it },
+                                            valueRange = 0.5f..1.8f,
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = accentColor,
+                                                activeTrackColor = accentColor,
+                                                inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                            )
+                                        )
+
+                                        Text(
+                                            text = "VIGNETTE • ${(photoVignette * 100).toInt()}%",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = interFamily
+                                        )
+                                        Slider(
+                                            value = photoVignette,
+                                            onValueChange = { photoVignette = it },
+                                            valueRange = 0f..0.9f,
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = accentColor,
+                                                activeTrackColor = accentColor,
+                                                inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                            )
+                                        )
+
+                                        Text(
+                                            text = "BLUR • ${photoBlur.value.toInt()}dp",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = interFamily
+                                        )
+                                        Slider(
+                                            value = photoBlur.value,
+                                            onValueChange = { photoBlur = it.dp },
+                                            valueRange = 0f..24f,
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = accentColor,
+                                                activeTrackColor = accentColor,
+                                                inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            StoryEditorTab.TEMPLATES -> {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "1-TAP STORY TEMPLATES (17 STYLES)",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = interFamily
+                                        )
+                                        // Bonus: Surprise Me — random template shuffle
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(accentColor.copy(alpha = 0.18f))
+                                                .border(1.dp, accentColor, RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    applyTemplate(templates.random())
+                                                    activeTab = StoryEditorTab.NONE
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(text = "🎲", fontSize = 11.sp)
+                                            Text(
+                                                text = "Surprise Me",
+                                                color = accentColor,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = interFamily
+                                            )
+                                        }
+                                    }
+
+                                    // Category Filter Chips
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        items(templateCategories) { cat ->
+                                            val isSelected = selectedTemplateCategory == cat
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(if (isSelected) accentColor else Color.White.copy(alpha = 0.08f))
+                                                    .clickable { selectedTemplateCategory = cat }
+                                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                            ) {
+                                                Text(
+                                                    text = cat,
+                                                    color = if (isSelected) Color.Black else Color.White,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = interFamily
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Template Cards with Live Gradient Preview
+                                    val filteredTemplates = remember(selectedTemplateCategory) {
+                                        if (selectedTemplateCategory == "All") templates
+                                        else templates.filter { it.category == selectedTemplateCategory }
+                                    }
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        items(filteredTemplates) { template ->
+                                            val tAccent = parseColor(template.accentHex)
+                                            val tBrush = Brush.verticalGradient(
+                                                listOf(
+                                                    parseColor(template.gradient.startHex),
+                                                    parseColor(template.gradient.endHex)
+                                                )
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(120.dp)
                                                     .clip(RoundedCornerShape(16.dp))
-                                                    .background(Color.Black.copy(alpha = 0.7f))
+                                                    .background(tBrush)
                                                     .border(1.5.dp, tAccent, RoundedCornerShape(16.dp))
                                                     .clickable {
                                                         applyTemplate(template)
                                                         activeTab = StoryEditorTab.NONE
                                                     }
-                                                    .padding(12.dp),
+                                                    .padding(vertical = 14.dp, horizontal = 8.dp),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Column(
                                                     horizontalAlignment = Alignment.CenterHorizontally,
                                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                                 ) {
-                                                    Text(text = template.icon, fontSize = 24.sp)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(Color.Black.copy(alpha = 0.45f))
+                                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = template.sticker.label.take(14),
+                                                            color = tAccent,
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontFamily = interFamily
+                                                        )
+                                                    }
+                                                    Text(text = template.icon, fontSize = 22.sp)
                                                     Text(
                                                         text = template.name,
-                                                        color = tAccent,
-                                                        fontSize = 12.sp,
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         fontFamily = interFamily,
-                                                        textAlign = TextAlign.Center
+                                                        textAlign = TextAlign.Center,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
                                                     )
                                                 }
                                             }
@@ -879,6 +1741,25 @@ fun CreateStoryScreen(
                                     }
 
                                     Text(
+                                        text = "TEXT SIZE • ${captionFontSize.toInt()}sp",
+                                        color = Color.White.copy(alpha = 0.6f),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = interFamily
+                                    )
+                                    Slider(
+                                        value = captionFontSize,
+                                        onValueChange = { captionFontSize = it },
+                                        valueRange = 18f..44f,
+                                        steps = 0,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = accentColor,
+                                            activeTrackColor = accentColor,
+                                            inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                                        )
+                                    )
+
+                                    Text(
                                         text = "HIGHLIGHT MODE",
                                         color = Color.White.copy(alpha = 0.6f),
                                         fontSize = 11.sp,
@@ -915,7 +1796,7 @@ fun CreateStoryScreen(
                             StoryEditorTab.STICKERS -> {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        val categories = listOf("Wake Up", "Streaks", "Habits", "Fails")
+                                        val categories = listOf("Wake Up", "Streaks", "Habits", "Fails", "Motivation", "Weekend")
                                         items(categories) { cat ->
                                             val isSelected = selectedStickerCategory == cat
                                             Box(
@@ -971,7 +1852,7 @@ fun CreateStoryScreen(
                             StoryEditorTab.SHAPES -> {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Text(
-                                        text = "SELECT CONTAINER SHAPE (8 STYLES)",
+                                        text = "SELECT CONTAINER SHAPE (13 STYLES)",
                                         color = Color.White.copy(alpha = 0.6f),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
