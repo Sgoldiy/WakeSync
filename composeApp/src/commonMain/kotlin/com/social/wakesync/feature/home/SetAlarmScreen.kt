@@ -88,6 +88,7 @@ fun SetAlarmScreen(
     var selectedMinute by remember { mutableIntStateOf(30) }
     var selectedMode by remember { mutableStateOf(if (preselectedRival != null) "Duo" else "Solo") }
     var selectedChallenge by remember { mutableStateOf("Math") }
+    var selectedCategoryFilter by remember { mutableStateOf("ALL") }
     var selectedMathDifficulty by remember { mutableStateOf("Medium") }
     val selectedDays = remember { mutableStateListOf(0, 1, 2, 3, 4) }
     var selectedPenalty by remember { mutableStateOf("shame") }
@@ -444,21 +445,95 @@ fun SetAlarmScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // CHALLENGE Section
-                SectionHeader("CHALLENGE", interFamily)
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
+                // CHALLENGE Section - GEN Z CYBER CARD SYSTEM
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionHeader("CHALLENGE", interFamily)
+                    Text(
+                        text = if (selectedChallenge == "Mystery") "🎰 Random Morning Chaos" else "SELECT GAME",
+                        color = if (selectedChallenge == "Mystery") AppColorPalette.GoldPremium else AppColorPalette.CyanCta,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = interFamily
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Gen Z Category Filter Pills
+                Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(listOf(
-                        "Math", "Memory", "Stroop", "Word Scramble", "Shake",
-                        "Speed Tap", "Odd One Out", "Sliding Tiles", "Orb Focus", "Rapid Tap"
-                    )) { challenge ->
-                        ChallengeChip(
-                            text = challenge,
-                            isSelected = selectedChallenge == challenge,
-                            onClick = { selectedChallenge = challenge }
+                    listOf(
+                        "ALL" to "All (11)",
+                        "BRAIN" to "🧠 Brain",
+                        "REFLEX" to "⚡ Reflex",
+                        "BED" to "🛏️ In-Bed"
+                    ).forEach { (catKey, label) ->
+                        val isCatSel = selectedCategoryFilter == catKey
+                        Box(
+                            modifier = Modifier
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(if (isCatSel) AppColorPalette.CyanCta.copy(alpha = 0.15f) else Color(0xFF0F1322))
+                                .border(
+                                    if (isCatSel) 1.5.dp else 1.dp,
+                                    if (isCatSel) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.08f),
+                                    RoundedCornerShape(99.dp)
+                                )
+                                .clickable { selectedCategoryFilter = catKey }
+                                .padding(horizontal = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isCatSel) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.5f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = interFamily
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Gen Z Game Cards Carousel
+                val filteredGames = remember(selectedCategoryFilter) {
+                    val allGames = listOf(
+                        GenZGameItem("Mystery", "Daily Mystery", "🎰", "🎲 Daily Chaos", "SPECIAL", "Surprise", AppColorPalette.GoldPremium),
+                        GenZGameItem("Math", "Speed Math", "🧮", "🧠 Mind Melt", "BRAIN", "15–30s", AppColorPalette.CyanCta),
+                        GenZGameItem("Memory", "Pattern Memory", "🧩", "🧠 Recall Test", "BRAIN", "20s", Color(0xFFA855F7)),
+                        GenZGameItem("Stroop", "Color Clash", "🎨", "🧠 Stroop Shock", "BRAIN", "15s", AppColorPalette.LossRed),
+                        GenZGameItem("Word Scramble", "Word Scramble", "🔤", "🧠 Anagram Race", "BRAIN", "25s", AppColorPalette.GoldPremium),
+                        GenZGameItem("Shake", "Shake Energy", "📱", "🛏️ Charge Bar", "BED", "10s", AppColorPalette.WinGreen),
+                        GenZGameItem("Speed Tap", "Speed Tap 1-6", "🔢", "⚡ Ascending", "REFLEX", "12s", AppColorPalette.CyanCta),
+                        GenZGameItem("Odd One Out", "Odd One Out", "🔍", "⚡ Search", "REFLEX", "10s", Color(0xFFA855F7)),
+                        GenZGameItem("Sliding Tiles", "Sliding Tiles", "🧱", "🧠 Tile Order", "BRAIN", "25s", AppColorPalette.GoldPremium),
+                        GenZGameItem("Orb Focus", "Orb Focus", "🎯", "🛏️ Bed Touch", "BED", "15s", AppColorPalette.WinGreen),
+                        GenZGameItem("Rapid Tap", "Rapid Bed Tap", "👆", "🛏️ Tap Sprint", "BED", "10s", AppColorPalette.CyanCta)
+                    )
+                    if (selectedCategoryFilter == "ALL") {
+                        allGames
+                    } else {
+                        allGames.filter { it.category == selectedCategoryFilter || it.category == "SPECIAL" }
+                    }
+                }
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(filteredGames) { game ->
+                        GenZGameCard(
+                            game = game,
+                            isSelected = selectedChallenge == game.id,
+                            onClick = { selectedChallenge = game.id },
+                            interFamily = interFamily
                         )
                     }
                 }
@@ -1065,6 +1140,126 @@ fun ModeButton(
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 13.sp
             )
+        }
+    }
+}
+
+data class GenZGameItem(
+    val id: String,
+    val name: String,
+    val emoji: String,
+    val tag: String,
+    val category: String,
+    val estTime: String,
+    val accentColor: Color
+)
+
+@Composable
+fun GenZGameCard(
+    game: GenZGameItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    interFamily: FontFamily
+) {
+    Box(
+        modifier = Modifier
+            .width(162.dp)
+            .height(126.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                if (isSelected) game.accentColor.copy(alpha = 0.12f)
+                else Color(0xFF0F1322)
+            )
+            .border(
+                if (isSelected) 2.dp else 1.dp,
+                if (isSelected) game.accentColor else Color.White.copy(alpha = 0.08f),
+                RoundedCornerShape(20.dp)
+            )
+            .clickable { onClick() }
+            .padding(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Top Row: Tag & Checkmark Indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = game.tag,
+                    color = if (isSelected) game.accentColor else Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = interFamily
+                )
+
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(game.accentColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "✓",
+                            color = Color.Black,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+
+            // Middle Row: Big Emoji with halo + Game Title
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(game.accentColor.copy(alpha = 0.18f))
+                        .border(1.dp, game.accentColor.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = game.emoji,
+                        fontSize = 20.sp
+                    )
+                }
+
+                Text(
+                    text = game.name,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.W800,
+                    fontFamily = interFamily,
+                    maxLines = 2,
+                    lineHeight = 15.sp
+                )
+            }
+
+            // Bottom Row: Time / Category Badge
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.White.copy(alpha = 0.05f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "⏱️ ${game.estTime}",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = interFamily
+                )
+            }
         }
     }
 }

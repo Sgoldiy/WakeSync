@@ -149,7 +149,8 @@ fun App(
                             onDismiss = onAlarmSolved,
                             onFailure = onAlarmFailed,
                             titleFamily = titleFamily,
-                            interFamily = interFamily
+                            interFamily = interFamily,
+                            challengeName = AlarmState.activeAlarmChallenge
                         )
                     }
                 }

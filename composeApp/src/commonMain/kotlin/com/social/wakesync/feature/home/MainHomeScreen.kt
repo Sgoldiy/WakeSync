@@ -172,7 +172,8 @@ fun MainHomeScreen(viewModel: HomeViewModel = viewModel { HomeViewModel() }) {
                     onDismiss = onAlarmSolvedHome,
                     onFailure = onAlarmFailedHome,
                     titleFamily = titleFamily,
-                    interFamily = interFamily
+                    interFamily = interFamily,
+                    challengeName = AlarmState.activeAlarmChallenge
                 )
             }
         }

@@ -222,6 +222,10 @@ class HomeViewModel : ViewModel() {
                         val hour = parts.getOrNull(0)?.toIntOrNull() ?: 0
                         val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
                         nextAlarmTimestamp = calculateNextOccurrence(hour, minute, nextAlarm.days)
+                        AlarmState.activeAlarmId = nextAlarm.id
+                        AlarmState.activeAlarmMode = nextAlarm.mode
+                        AlarmState.activeAlarmChallenge = nextAlarm.challenge
+                        AlarmState.activeAlarmPartnerUsername = nextAlarm.partnerUsername
                         _uiState.update { it.copy(
                             nextAlarmTime = formatAlarmTime12h(nextAlarm.time),
                             isGroupAlarm = nextAlarm.isGroup,

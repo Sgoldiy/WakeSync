@@ -20,14 +20,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
@@ -97,7 +100,7 @@ fun AlarmPuzzleSolo(
     // Successful Completion -> User WINS & GAINS 1 STREAK!
     var attemptNumber by remember { mutableIntStateOf(1) } // 1 or 2
     var secondsLeft by remember { mutableIntStateOf(60) }
-    var activePuzzleType by remember {
+    var activePuzzleType by remember(challengeName) {
         mutableStateOf(getPuzzleTypeFromName(challengeName))
     }
 
@@ -301,16 +304,17 @@ fun AlarmPuzzleSolo(
 }
 
 private fun getPuzzleTypeFromName(name: String): SoloPuzzleType {
-    return when (name) {
-        "Memory" -> SoloPuzzleType.MEMORY
-        "Stroop" -> SoloPuzzleType.STROOP
-        "Word Scramble" -> SoloPuzzleType.WORD_UNSCRAMBLE
-        "Shake" -> SoloPuzzleType.SHAKE
-        "Speed Tap" -> SoloPuzzleType.NUMBER_ORDER
-        "Odd One Out" -> SoloPuzzleType.ODD_ONE_OUT
-        "Sliding Tiles" -> SoloPuzzleType.SLIDING_TILE
-        "Orb Focus" -> SoloPuzzleType.BALANCE_MAZE
-        "Rapid Tap" -> SoloPuzzleType.BED_TAP
+    val clean = name.trim()
+    return when {
+        clean.contains("Memory", ignoreCase = true) -> SoloPuzzleType.MEMORY
+        clean.contains("Stroop", ignoreCase = true) -> SoloPuzzleType.STROOP
+        clean.contains("Word", ignoreCase = true) || clean.contains("Scramble", ignoreCase = true) -> SoloPuzzleType.WORD_UNSCRAMBLE
+        clean.contains("Shake", ignoreCase = true) -> SoloPuzzleType.SHAKE
+        clean.contains("Speed", ignoreCase = true) || clean.contains("Tap 1-6", ignoreCase = true) || clean.contains("Order", ignoreCase = true) -> SoloPuzzleType.NUMBER_ORDER
+        clean.contains("Odd", ignoreCase = true) || clean.contains("Intruder", ignoreCase = true) -> SoloPuzzleType.ODD_ONE_OUT
+        clean.contains("Sliding", ignoreCase = true) || clean.contains("Tile", ignoreCase = true) -> SoloPuzzleType.SLIDING_TILE
+        clean.contains("Orb", ignoreCase = true) || clean.contains("Focus", ignoreCase = true) || clean.contains("Balance", ignoreCase = true) -> SoloPuzzleType.BALANCE_MAZE
+        clean.contains("Rapid", ignoreCase = true) || clean.contains("Bed", ignoreCase = true) -> SoloPuzzleType.BED_TAP
         else -> SoloPuzzleType.MATH
     }
 }
@@ -374,21 +378,23 @@ private fun SoloMemoryComponent(
     interFamily: FontFamily
 ) {
     val gridSize = 9 // 3x3
-    val targetSequence = remember { (0 until gridSize).shuffled().take(4) }
-    val userSequence = remember { mutableStateListOf<Int>() }
+    var patternVersion by remember { mutableIntStateOf(1) }
+    val targetSequence = remember(patternVersion) { (0 until gridSize).shuffled().take(4) }
+    val userSequence = remember(patternVersion) { mutableStateListOf<Int>() }
     var isShowingPattern by remember { mutableStateOf(true) }
     var activeFlashTile by remember { mutableIntStateOf(-1) }
     var isErrorFlash by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(patternVersion) {
         isShowingPattern = true
+        isErrorFlash = false
         userSequence.clear()
-        delay(300)
+        delay(400)
         for (tile in targetSequence) {
             activeFlashTile = tile
             delay(450)
             activeFlashTile = -1
-            delay(180)
+            delay(200)
         }
         isShowingPattern = false
     }
@@ -396,9 +402,9 @@ private fun SoloMemoryComponent(
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             text = when {
-                isErrorFlash -> "❌ Pattern Missed! Resetting..."
+                isErrorFlash -> "❌ Missed! Replaying pattern..."
                 isShowingPattern -> "Watch & Memorize Sequence..."
-                else -> "Tap the 4 tiles in order!"
+                else -> "Tap the 4 tiles in order (${userSequence.size}/4)"
             },
             color = when {
                 isErrorFlash -> AppColorPalette.LossRed
@@ -432,15 +438,13 @@ private fun SoloMemoryComponent(
                         .fillMaxSize()
                         .clip(RoundedCornerShape(14.dp))
                         .background(color)
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                        .border(1.dp, if (isHighlighted) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
                         .clickable(enabled = !isShowingPattern && !isErrorFlash) {
                             userSequence.add(index)
                             val step = userSequence.size - 1
                             if (userSequence[step] != targetSequence[step]) {
                                 isErrorFlash = true
-                                userSequence.clear()
-                                isShowingPattern = true
-                                activeFlashTile = -1
+                                patternVersion++
                             } else if (userSequence.size == targetSequence.size) {
                                 onSuccess()
                             }
@@ -467,17 +471,36 @@ private fun SoloStroopComponent(
         Pair("GOLD", AppColorPalette.GoldPremium)
     )
 
-    val targetPair = remember { colors.random() }
-    val displayColor = remember { colors.filter { it != targetPair }.random().second }
+    var round by remember { mutableIntStateOf(1) }
+    val targetPair = remember(round) { colors.random() }
+    val displayColor = remember(round) { colors.filter { it != targetPair }.random().second }
+    var isError by remember { mutableStateOf(false) }
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Tap the FONT COLOR (not the written word)", color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp, fontFamily = interFamily)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Text(
+            text = if (isError) "❌ Wrong! Tap the FONT COLOR, not the word!" else "Tap the button matching the FONT COLOR below:",
+            color = if (isError) AppColorPalette.LossRed else Color.White.copy(alpha = 0.7f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = interFamily
+        )
 
         Box(
-            modifier = Modifier.fillMaxWidth().height(90.dp).clip(RoundedCornerShape(20.dp)).background(AppColorPalette.Surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(90.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(AppColorPalette.Surface)
+                .border(2.dp, if (isError) AppColorPalette.LossRed else Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Text(targetPair.first, color = displayColor, fontSize = 38.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
+            Text(
+                text = targetPair.first,
+                color = displayColor,
+                fontSize = 38.sp,
+                fontWeight = FontWeight.W900,
+                fontFamily = titleFamily
+            )
         }
 
         LazyVerticalGrid(
@@ -494,10 +517,24 @@ private fun SoloStroopComponent(
                         .clip(RoundedCornerShape(14.dp))
                         .background(colorOption.second.copy(alpha = 0.15f))
                         .border(1.5.dp, colorOption.second, RoundedCornerShape(14.dp))
-                        .clickable { if (colorOption.second == displayColor) onSuccess() },
+                        .clickable {
+                            if (colorOption.second == displayColor) {
+                                isError = false
+                                onSuccess()
+                            } else {
+                                isError = true
+                                round++
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(colorOption.first, color = colorOption.second, fontSize = 16.sp, fontWeight = FontWeight.Black, fontFamily = interFamily)
+                    Text(
+                        text = colorOption.first,
+                        color = colorOption.second,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = interFamily
+                    )
                 }
             }
         }
@@ -513,10 +550,12 @@ private fun SoloWordUnscrambleComponent(
     titleFamily: FontFamily,
     interFamily: FontFamily
 ) {
-    val wordList = listOf("WAKE", "RISE", "FOCUS", "ALERT", "POWER")
+    val wordList = listOf("WAKE", "RISE", "FOCUS", "ALERT", "POWER", "SHINE", "SMASH")
     val originalWord = remember { wordList.random() }
     val scrambled = remember(originalWord) { originalWord.toList().shuffled().joinToString("") }
-    var currentInput by remember { mutableStateOf("") }
+    val selectedIndices = remember { mutableStateListOf<Int>() }
+
+    val currentInput = selectedIndices.map { scrambled[it] }.joinToString("")
 
     LaunchedEffect(currentInput) {
         if (currentInput.equals(originalWord, ignoreCase = true)) {
@@ -526,32 +565,69 @@ private fun SoloWordUnscrambleComponent(
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Unscramble the wake-up word", color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp, fontFamily = interFamily)
+        Text("Unscramble the wake-up word", color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = interFamily)
 
+        // Scrambled letters prompt
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             scrambled.forEach { char ->
-                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(AppColorPalette.DeepSurface), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(AppColorPalette.DeepSurface),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(char.toString(), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = titleFamily)
                 }
             }
         }
 
-        Box(
-            modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp)).background(AppColorPalette.Surface).border(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center
+        // Active Input Box
+        Row(
+            modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp)).background(AppColorPalette.Surface).border(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(currentInput.ifEmpty { "Tap letters below" }, color = if (currentInput.isEmpty()) Color.White.copy(alpha = 0.3f) else AppColorPalette.CyanCta, fontSize = 22.sp, fontWeight = FontWeight.W800, fontFamily = titleFamily)
+            Text(
+                text = currentInput.ifEmpty { "Tap letters below..." },
+                color = if (currentInput.isEmpty()) Color.White.copy(alpha = 0.3f) else AppColorPalette.CyanCta,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.W800,
+                fontFamily = titleFamily
+            )
+
+            if (selectedIndices.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.1f))
+                        .clickable { selectedIndices.removeAt(selectedIndices.size - 1) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text("⌫ Undo", color = Color.White, fontSize = 12.sp, fontFamily = interFamily)
+                }
+            }
         }
 
+        // Letter Bank Buttons
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            scrambled.toList().shuffled().forEach { letter ->
+            scrambled.forEachIndexed { idx, letter ->
+                val isUsed = selectedIndices.contains(idx)
                 Box(
-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.08f)).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)).clickable {
-                        if (currentInput.length < originalWord.length) currentInput += letter
-                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isUsed) Color.White.copy(alpha = 0.03f) else AppColorPalette.CyanCta.copy(alpha = 0.15f))
+                        .border(1.dp, if (isUsed) Color.Transparent else AppColorPalette.CyanCta, RoundedCornerShape(12.dp))
+                        .clickable(enabled = !isUsed) {
+                            selectedIndices.add(idx)
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(letter.toString(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+                    Text(
+                        text = letter.toString(),
+                        color = if (isUsed) Color.White.copy(alpha = 0.2f) else Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = interFamily
+                    )
                 }
             }
         }
@@ -575,16 +651,48 @@ private fun SoloShakeComponent(
     }
 
     val transition = rememberInfiniteTransition(label = "pulse")
-    val scale by transition.animateFloat(initialValue = 0.95f, targetValue = 1.05f, animationSpec = infiniteRepeatable(tween(400, easing = EaseInOutSine), RepeatMode.Reverse), label = "scale")
+    val scale by transition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(tween(400, easing = EaseInOutSine), RepeatMode.Reverse),
+        label = "scale"
+    )
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(130.dp).scale(scale).clickable { shakesCount++ }) {
-            Box(modifier = Modifier.fillMaxSize().background(AppColorPalette.CyanCta.copy(alpha = 0.15f), CircleShape))
-            Text("📱", fontSize = 60.sp)
+    val progress = (shakesCount.toFloat() / requiredShakes.toFloat()).coerceIn(0f, 1f)
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(130.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .background(AppColorPalette.CyanCta.copy(alpha = 0.15f))
+                .border(2.dp, AppColorPalette.CyanCta, CircleShape)
+                .clickable { shakesCount++ }
+        ) {
+            Text("📱", fontSize = 54.sp)
         }
-        Text("Shake / Tap rapidly to charge energy!", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
-        Box(modifier = Modifier.fillMaxWidth().height(16.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f))) {
-            Box(modifier = Modifier.fillMaxWidth(shakesCount.toFloat() / requiredShakes).fillMaxSize().background(Brush.horizontalGradient(listOf(AppColorPalette.CyanCta, AppColorPalette.WinGreen))))
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Shake / Tap rapidly to charge energy!", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+            Text("${(progress * 100).toInt()}% Charged ($shakesCount / $requiredShakes)", color = AppColorPalette.CyanCta, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = interFamily)
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(18.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.08f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(AppColorPalette.CyanCta, AppColorPalette.WinGreen)))
+            )
         }
     }
 }
@@ -600,9 +708,16 @@ private fun SoloNumberOrderComponent(
 ) {
     var nextExpected by remember { mutableIntStateOf(1) }
     val numbers = remember { (1..6).shuffled() }
+    var isError by remember { mutableStateOf(false) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Tap numbers in order: $nextExpected ➔ 6", color = AppColorPalette.CyanCta, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+        Text(
+            text = if (isError) "❌ Wrong order! Tap #$nextExpected next!" else "Tap numbers in order: #$nextExpected ➔ 6",
+            color = if (isError) AppColorPalette.LossRed else AppColorPalette.CyanCta,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = interFamily
+        )
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
@@ -622,12 +737,21 @@ private fun SoloNumberOrderComponent(
                         .border(1.5.dp, if (isCleared) AppColorPalette.WinGreen else Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                         .clickable(enabled = !isCleared) {
                             if (num == nextExpected) {
+                                isError = false
                                 if (nextExpected == 6) onSuccess() else nextExpected++
+                            } else {
+                                isError = true
                             }
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(num.toString(), color = if (isCleared) AppColorPalette.WinGreen else Color.White, fontSize = 24.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
+                    Text(
+                        text = num.toString(),
+                        color = if (isCleared) AppColorPalette.WinGreen else Color.White,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.W900,
+                        fontFamily = titleFamily
+                    )
                 }
             }
         }
@@ -643,11 +767,24 @@ private fun SoloOddOneOutComponent(
     titleFamily: FontFamily,
     interFamily: FontFamily
 ) {
-    val items = remember { listOf("🔥", "🔥", "🔥", "🔥", "🔥", "🔥", "🔥", "💥", "🔥") }
-    val targetIndex = 7
+    val sets = listOf(
+        Pair(listOf("🔥", "🔥", "🔥", "🔥", "💥", "🔥", "🔥", "🔥", "🔥"), 4),
+        Pair(listOf("🐱", "🐱", "🐱", "🐶", "🐱", "🐱", "🐱", "🐱", "🐱"), 3),
+        Pair(listOf("⭐", "⭐", "⭐", "⭐", "⭐", "🌟", "⭐", "⭐", "⭐"), 5),
+        Pair(listOf("😴", "😴", "🥱", "😴", "😴", "😴", "😴", "😴", "😴"), 2)
+    )
+
+    val currentSet = remember { sets.random() }
+    var isError by remember { mutableStateOf(false) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Find the odd intruder emoji!", color = AppColorPalette.CyanCta, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+        Text(
+            text = if (isError) "❌ Try again! Find the intruder emoji!" else "Find the odd intruder emoji!",
+            color = if (isError) AppColorPalette.LossRed else AppColorPalette.CyanCta,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = interFamily
+        )
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
@@ -655,17 +792,24 @@ private fun SoloOddOneOutComponent(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(items.size) { idx ->
+            items(currentSet.first.size) { idx ->
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(16.dp))
                         .background(AppColorPalette.Surface)
                         .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-                        .clickable { if (idx == targetIndex) onSuccess() },
+                        .clickable {
+                            if (idx == currentSet.second) {
+                                isError = false
+                                onSuccess()
+                            } else {
+                                isError = true
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(items[idx], fontSize = 32.sp)
+                    Text(currentSet.first[idx], fontSize = 32.sp)
                 }
             }
         }
@@ -673,7 +817,7 @@ private fun SoloOddOneOutComponent(
 }
 
 // -----------------------------------------------------------------------------
-// 8. SLIDING TILE TASK
+// 8. TILE SWAP TASK
 // -----------------------------------------------------------------------------
 @Composable
 private fun SoloSlidingTileComponent(
@@ -681,14 +825,25 @@ private fun SoloSlidingTileComponent(
     titleFamily: FontFamily,
     interFamily: FontFamily
 ) {
-    val currentTiles = remember { mutableStateListOf(2, 1, 3, 4) }
+    val currentTiles = remember { mutableStateListOf(3, 1, 4, 2) }
+    var selectedIndex by remember { mutableIntStateOf(-1) }
 
     LaunchedEffect(currentTiles.toList()) {
-        if (currentTiles == listOf(1, 2, 3, 4)) onSuccess()
+        if (currentTiles.toList() == listOf(1, 2, 3, 4)) {
+            delay(150)
+            onSuccess()
+        }
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Tap tiles to arrange in order 1 ➔ 2 ➔ 3 ➔ 4", color = AppColorPalette.CyanCta, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+        Text(
+            text = if (selectedIndex == -1) "Tap any tile to select, then tap another to swap!" else "Tap destination tile to swap!",
+            color = AppColorPalette.CyanCta,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = interFamily,
+            textAlign = TextAlign.Center
+        )
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -698,22 +853,29 @@ private fun SoloSlidingTileComponent(
         ) {
             items(4) { idx ->
                 val num = currentTiles[idx]
+                val isSelected = selectedIndex == idx
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(AppColorPalette.Surface)
-                        .border(1.5.dp, AppColorPalette.CyanCta.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        .background(if (isSelected) AppColorPalette.CyanCta.copy(alpha = 0.3f) else AppColorPalette.Surface)
+                        .border(1.5.dp, if (isSelected) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                         .clickable {
-                            if (idx < 3) {
-                                val temp = currentTiles[idx]
-                                currentTiles[idx] = currentTiles[idx + 1]
-                                currentTiles[idx + 1] = temp
+                            if (selectedIndex == -1) {
+                                selectedIndex = idx
+                            } else if (selectedIndex == idx) {
+                                selectedIndex = -1
+                            } else {
+                                val temp = currentTiles[selectedIndex]
+                                currentTiles[selectedIndex] = currentTiles[idx]
+                                currentTiles[idx] = temp
+                                selectedIndex = -1
                             }
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(num.toString(), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
+                    Text(num.toString(), color = if (isSelected) AppColorPalette.CyanCta else Color.White, fontSize = 32.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
                 }
             }
         }
@@ -730,21 +892,40 @@ private fun SoloBalanceMazeComponent(
     interFamily: FontFamily
 ) {
     var tapsLeft by remember { mutableIntStateOf(4) }
+    var orbXOffset by remember { mutableIntStateOf(0) }
+    var orbYOffset by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(tapsLeft) {
         if (tapsLeft <= 0) onSuccess()
     }
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Tap the glowing center orb to focus!", color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = interFamily)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Text("Tap the glowing orb as it jumps!", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp, fontFamily = interFamily)
 
         Box(
-            modifier = Modifier.size(170.dp).clip(CircleShape).background(AppColorPalette.Surface).border(2.dp, AppColorPalette.CyanCta, CircleShape).clickable {
-                tapsLeft--
-            },
+            modifier = Modifier
+                .size(220.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(AppColorPalette.Surface)
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Box(modifier = Modifier.size(54.dp).clip(CircleShape).background(AppColorPalette.CyanCta))
+            Box(
+                modifier = Modifier
+                    .offset(x = orbXOffset.dp, y = orbYOffset.dp)
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(AppColorPalette.CyanCta)
+                    .border(2.dp, Color.White, CircleShape)
+                    .clickable {
+                        tapsLeft--
+                        orbXOffset = (-60..60).random()
+                        orbYOffset = (-60..60).random()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🎯", fontSize = 24.sp)
+            }
         }
 
         Text("$tapsLeft focus taps remaining", color = AppColorPalette.CyanCta, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
@@ -752,7 +933,7 @@ private fun SoloBalanceMazeComponent(
 }
 
 // -----------------------------------------------------------------------------
-// 10. BED-FRIENDLY RAPID BED TAP TASK (Replaced Physical Squat)
+// 10. BED-FRIENDLY RAPID BED TAP TASK
 // -----------------------------------------------------------------------------
 @Composable
 private fun SoloBedTapComponent(
@@ -771,7 +952,12 @@ private fun SoloBedTapComponent(
         Text("Rapidly tap button in bed to wake up!", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
 
         Box(
-            modifier = Modifier.size(130.dp).clip(CircleShape).background(AppColorPalette.WinGreen.copy(alpha = 0.15f)).border(2.dp, AppColorPalette.WinGreen, CircleShape).clickable { tapCount++ },
+            modifier = Modifier
+                .size(140.dp)
+                .clip(CircleShape)
+                .background(AppColorPalette.WinGreen.copy(alpha = 0.15f))
+                .border(3.dp, AppColorPalette.WinGreen, CircleShape)
+                .clickable { tapCount++ },
             contentAlignment = Alignment.Center
         ) {
             Text("👆", fontSize = 54.sp)
