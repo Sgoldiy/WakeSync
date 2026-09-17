@@ -546,16 +546,6 @@ fun SetAlarmScreen(
                     }
                 }
 
-                // Full Screen Practice Demo Arcade
-                demoGameTarget?.let { game ->
-                    DemoGameFullScreen(
-                        game = game,
-                        onDismiss = { demoGameTarget = null },
-                        titleFamily = titleFamily,
-                        interFamily = interFamily
-                    )
-                }
-
                 // ONLY Math displays the Level 1, Level 2, Level 3 sub-selector bar!
                 if (selectedChallenge == "Math") {
                     Spacer(modifier = Modifier.height(12.dp))
@@ -810,6 +800,25 @@ fun SetAlarmScreen(
                     onSearchUsers = onSearchUsers,
                     titleFamily = titleFamily,
                     interFamily = interFamily
+                )
+            }
+        }
+
+        // ── FULL-SCREEN PRACTICE DEMO OVERLAY ─────────────────────────────────────
+        // Renders on top of the entire SetAlarm screen when the user taps 🎮 Try.
+        demoGameTarget?.let { game ->
+            val challengeName = if (game.id == "Mystery") {
+                listOf("Math", "Memory", "Stroop", "Word Scramble", "Shake", "Speed Tap", "Odd One Out", "Sliding Tiles", "Orb Focus", "Rapid Tap").random()
+            } else {
+                game.id
+            }
+            Box(modifier = Modifier.fillMaxSize()) {
+                GameDemoScreen(
+                    onDismiss = { demoGameTarget = null },
+                    titleFamily = titleFamily,
+                    interFamily = interFamily,
+                    challengeName = challengeName,
+                    mathDifficulty = selectedMathDifficulty
                 )
             }
         }
@@ -1414,181 +1423,7 @@ fun GenZGameCard(
     }
 }
 
-@Composable
-fun DemoGameFullScreen(
-    game: GenZGameItem,
-    onDismiss: () -> Unit,
-    titleFamily: FontFamily,
-    interFamily: FontFamily
-) {
-    var isCompleted by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppColorPalette.VoidBg)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Header Row: Exit Button & Practice Mode Badge
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.08f))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                        .clickable { onDismiss() }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("←", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("Exit Practice", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
-                }
-
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(game.accentColor.copy(alpha = 0.15f))
-                        .border(1.dp, game.accentColor, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("🎮", fontSize = 14.sp)
-                    Text(
-                        text = "PRACTICE DEMO",
-                        color = game.accentColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = titleFamily,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-
-            // Title Header
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(game.emoji, fontSize = 32.sp)
-                    Text(
-                        text = game.name,
-                        color = Color.White,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.W900,
-                        fontFamily = titleFamily
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Unlimited time · Practice round before setting alarm",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = interFamily
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Main Interactive Full Screen Game Canvas
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(AppColorPalette.Surface)
-                    .border(1.5.dp, game.accentColor.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isCompleted) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text("🏆", fontSize = 64.sp)
-                        Text(
-                            text = "DEMO COMPLETED!",
-                            color = AppColorPalette.WinGreen,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.W900,
-                            fontFamily = titleFamily
-                        )
-                        Text(
-                            text = "Great job! You are ready to crush this alarm.",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 14.sp,
-                            fontFamily = interFamily,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(
-                                onClick = { isCompleted = false },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Text("Play Again 🔄", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = interFamily)
-                            }
-                            Button(
-                                onClick = onDismiss,
-                                colors = ButtonDefaults.buttonColors(containerColor = AppColorPalette.CyanCta),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Text("Set Alarm ⏰", color = Color.Black, fontWeight = FontWeight.Bold, fontFamily = interFamily)
-                            }
-                        }
-                    }
-                } else {
-                    AlarmPuzzleSolo(
-                        onDismiss = { isCompleted = true },
-                        onFailure = { isCompleted = false },
-                        titleFamily = titleFamily,
-                        interFamily = interFamily,
-                        challengeName = if (game.id == "Mystery") listOf("Math", "Memory", "Stroop", "Word Scramble", "Shake", "Speed Tap", "Odd One Out", "Sliding Tiles", "Orb Focus", "Rapid Tap").random() else game.id
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Bottom Tip Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "💡 Solve the practice puzzle above to complete the demo!",
-                    color = Color.White.copy(alpha = 0.4f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = interFamily
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun ChallengeChip(text: String, isSelected: Boolean, onClick: () -> Unit) {
