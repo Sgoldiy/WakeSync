@@ -1367,7 +1367,12 @@ class AndroidHomeRepository : HomeRepository {
                         badgeColorHex = doc.getString("badgeColorHex") ?: "#22C55E",
                         streak = doc.getLong("streak")?.toInt() ?: 0,
                         createdAt = doc.getLong("createdAt") ?: 0L,
-                        reactions = reactionsMap
+                        reactions = reactionsMap,
+                        isShameReceipt = doc.getBoolean("isShameReceipt") ?: (doc.getString("badgeText") == "shame" || doc.getString("badgeText") == "loss"),
+                        missedTime = doc.getString("missedTime") ?: "",
+                        challengeName = doc.getString("challengeName") ?: "",
+                        punishmentText = doc.getString("punishmentText") ?: "",
+                        shameCaption = doc.getString("shameCaption") ?: doc.getString("content") ?: ""
                     )
                 } ?: emptyList()
                 trySend(posts)
@@ -1387,7 +1392,7 @@ class AndroidHomeRepository : HomeRepository {
             val badgeColorHex = when (badge) {
                 "win" -> "#22C55E"
                 "streak" -> "#FFD23D"
-                "loss" -> "#FF3D71"
+                "loss", "shame" -> "#FF3D71"
                 else -> "#00E0FF"
             }
 
@@ -1402,6 +1407,46 @@ class AndroidHomeRepository : HomeRepository {
                     "streak" to streak,
                     "createdAt" to now,
                     "reactions" to emptyMap<String, Int>()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun postShameReceipt(
+        alarmTime: String,
+        challengeName: String,
+        streakLost: Int,
+        punishmentText: String,
+        customCaption: String?
+    ): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: return Result.failure(Exception("Not authenticated"))
+            val now = Clock.System.now().toEpochMilliseconds()
+            val userDoc = db.collection("users").document(user.uid).get().await()
+            val username = userDoc.getString("username") ?: "Unknown"
+            val avatar = userDoc.getString("avatarEmoji") ?: "👤"
+
+            val caption = customCaption ?: "@$username slept through $alarmTime alarm 😴"
+
+            db.collection("feed").add(
+                hashMapOf(
+                    "userId" to user.uid,
+                    "username" to username,
+                    "avatar" to avatar,
+                    "content" to caption,
+                    "badgeText" to "shame",
+                    "badgeColorHex" to "#FF3D71",
+                    "streak" to 0,
+                    "createdAt" to now,
+                    "reactions" to mapOf("💀" to 1, "😂" to 1),
+                    "isShameReceipt" to true,
+                    "missedTime" to alarmTime,
+                    "challengeName" to challengeName,
+                    "punishmentText" to punishmentText,
+                    "shameCaption" to caption
                 )
             ).await()
             Result.success(Unit)

@@ -15,4 +15,5 @@ object AppColorPalette {
 
     // Deep Surfaces
     val DeepSurface = Color(0xFF0D111F)
+    val MagentaHot = Color(0xFFFF007A)
 }

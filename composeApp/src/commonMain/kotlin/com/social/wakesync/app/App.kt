@@ -156,16 +156,18 @@ fun App(
                 }
             }
         } else if (AlarmState.showStreakSave) {
+            val partnerName = AlarmState.activeAlarmPartnerUsername ?: "alex"
+            val partnerAvatar = homeUiState.friends.find { it.name == AlarmState.activeAlarmPartnerUsername }?.avatar ?: "🦁"
             StreakSaveScreen(
                 streakDays = homeUiState.streak,
                 finishPosition = 1,
                 totalParticipants = if (AlarmState.activeAlarmMode == "Solo") 1 else 2,
-                sleepingFriends = if (AlarmState.activeAlarmMode == "Solo") emptyList() else {
-                    val partnerName = AlarmState.activeAlarmPartnerUsername ?: ""
-                    val partnerAvatar = homeUiState.friends.find { it.name == partnerName }?.avatar ?: "👤"
-                    listOf(partnerAvatar)
-                },
+                sleepingFriends = if (AlarmState.activeAlarmMode == "Solo") emptyList() else listOf(partnerAvatar),
                 friendsLostCount = 0,
+                rivalName = partnerName,
+                rivalAvatar = partnerAvatar,
+                userAvatar = homeUiState.avatarEmoji.ifEmpty { "🤯" },
+                isDuoOrGroup = AlarmState.activeAlarmMode != "Solo",
                 onShareClick = { /* TODO: share logic */ },
                 onBackToHome = { AlarmState.showStreakSave = false },
                 titleFamily = titleFamily,
@@ -183,6 +185,7 @@ fun App(
                     showPunishment = true
                 },
                 onUseInsurance = { /* TODO: insurance/premium logic */ },
+                onBroadcastShame = { caption -> homeViewModel.broadcastShameReceipt(caption) },
                 onBackToHome = {
                     AlarmState.showStreakBroken = false
                     showPunishment = false

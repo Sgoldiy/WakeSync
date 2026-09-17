@@ -2,11 +2,16 @@ package com.social.wakesync.feature.home
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +20,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +37,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
@@ -59,6 +65,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.social.wakesync.ui.theme.AppColorPalette
@@ -68,7 +75,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 
 enum class SoloPuzzleType(val displayName: String, val emoji: String) {
-    MATH("Speed Math", "🧮"),            // 1. Math Game (Only game with 3 Levels: Easy=1 Q, Medium=2 Qs, Hard=3 Qs)
+    MATH("Speed Math", "🧮"),            // 1. Math Game
     MEMORY("Pattern Memory", "🧩"),        // 2. 3x3 Flashing Pattern Recall
     STROOP("Color Clash", "🎨"),           // 3. Stroop Color Conflict Test
     WORD_UNSCRAMBLE("Word Scramble", "🔤"), // 4. Anagram Unscramble
@@ -77,7 +84,7 @@ enum class SoloPuzzleType(val displayName: String, val emoji: String) {
     ODD_ONE_OUT("Odd One Out", "🔍"),      // 7. Visual Intruder Search
     SLIDING_TILE("Sliding Tiles", "🧱"),    // 8. 1-2-3 Tile Sequence Arrange
     BALANCE_MAZE("Orb Focus", "🎯"),        // 9. Bed-friendly Orb Center Touch Focus
-    BED_TAP("Rapid Bed Tap", "👆")         // 10. Bed-friendly Finger Tap Sprint (Replaced Physical Squat)
+    BED_TAP("Rapid Bed Tap", "👆")         // 10. Bed-friendly Finger Tap Sprint
 }
 
 @Composable
@@ -94,10 +101,6 @@ fun AlarmPuzzleSolo(
     var timeString by remember { mutableStateOf("06:30") }
     var currentStage by remember { mutableIntStateOf(1) }
 
-    // 60-Second Timer Rules & Auto-Change Mechanism:
-    // Attempt 1 (60s countdown) -> If time expires, automatically change task to a 2nd random task!
-    // Attempt 2 (60s countdown) -> If 2nd attempt also expires, user FAILS & LOSES 3 STREAKS!
-    // Successful Completion -> User WINS & GAINS 1 STREAK!
     var attemptNumber by remember { mutableIntStateOf(1) } // 1 or 2
     var secondsLeft by remember { mutableIntStateOf(60) }
     var activePuzzleType by remember(challengeName) {
@@ -136,16 +139,13 @@ fun AlarmPuzzleSolo(
             secondsLeft--
         }
 
-        // Timer Expired!
         if (attemptNumber == 1) {
-            // Attempt 1 Failed -> Auto-change task and give Attempt 2 (60s)
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             attemptNumber = 2
             currentStage = 1
             val availablePuzzles = SoloPuzzleType.values().filter { it != activePuzzleType }
             activePuzzleType = availablePuzzles.random()
         } else {
-            // Attempt 2 Failed -> User fails alarm, loses 3 streaks & triggers Broken Streak screen!
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             onFailure()
         }
@@ -154,7 +154,6 @@ fun AlarmPuzzleSolo(
     val onStageSuccess = {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         if (currentStage >= totalStages) {
-            // Success! Gain 1 streak & dismiss alarm
             onDismiss()
         } else {
             currentStage++
@@ -280,7 +279,7 @@ fun AlarmPuzzleSolo(
                 letterSpacing = 1.sp
             )
 
-            // Active Bed-Friendly Task Component
+            // Active Task Component
             AnimatedContent(
                 targetState = Pair(activePuzzleType, currentStage),
                 transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) },
@@ -320,7 +319,7 @@ private fun getPuzzleTypeFromName(name: String): SoloPuzzleType {
 }
 
 // -----------------------------------------------------------------------------
-// 1. MATH TASK (3 Levels: Easy=1 Q, Medium=2 Qs, Hard=3 Qs)
+// 1. SPEED MATH TASK (3 Levels: Easy=1 Q, Medium=2 Qs, Hard=3 Qs)
 // -----------------------------------------------------------------------------
 @Composable
 private fun SoloMathComponent(
@@ -331,9 +330,11 @@ private fun SoloMathComponent(
 ) {
     val puzzle = remember(stage) { generateStageSoloPuzzle(stage) }
     var currentInput by remember { mutableStateOf("") }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(currentInput) {
         if (currentInput == puzzle.answer.toString()) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             delay(150)
             onSuccess()
         }
@@ -344,16 +345,24 @@ private fun SoloMathComponent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth().height(84.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(88.dp)
+                .border(
+                    BorderStroke(
+                        1.5.dp,
+                        Brush.horizontalGradient(listOf(AppColorPalette.CyanCta, AppColorPalette.MagentaHot))
+                    ),
+                    RoundedCornerShape(20.dp)
+                ),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = AppColorPalette.Surface),
-            border = BorderStroke(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.3f))
+            colors = CardDefaults.cardColors(containerColor = AppColorPalette.Surface)
         ) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = "${puzzle.question} = ${currentInput.ifEmpty { "···" }}",
                     color = AppColorPalette.CyanCta,
-                    fontSize = 32.sp,
+                    fontSize = 34.sp,
                     fontWeight = FontWeight.W900,
                     fontFamily = titleFamily
                 )
@@ -361,8 +370,14 @@ private fun SoloMathComponent(
         }
 
         SoloNumpad(
-            onNumberClick = { num -> if (currentInput.length < 5) currentInput += num },
-            onDeleteClick = { if (currentInput.isNotEmpty()) currentInput = currentInput.dropLast(1) },
+            onNumberClick = { num ->
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                if (currentInput.length < 5) currentInput += num
+            },
+            onDeleteClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                if (currentInput.isNotEmpty()) currentInput = currentInput.dropLast(1)
+            },
             titleFamily = titleFamily
         )
     }
@@ -384,6 +399,7 @@ private fun SoloMemoryComponent(
     var isShowingPattern by remember { mutableStateOf(true) }
     var activeFlashTile by remember { mutableIntStateOf(-1) }
     var isErrorFlash by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(patternVersion) {
         isShowingPattern = true
@@ -392,6 +408,7 @@ private fun SoloMemoryComponent(
         delay(400)
         for (tile in targetSequence) {
             activeFlashTile = tile
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             delay(450)
             activeFlashTile = -1
             delay(200)
@@ -402,23 +419,23 @@ private fun SoloMemoryComponent(
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             text = when {
-                isErrorFlash -> "❌ Missed! Replaying pattern..."
-                isShowingPattern -> "Watch & Memorize Sequence..."
+                isErrorFlash -> "❌ Missed sequence! Replaying pattern..."
+                isShowingPattern -> "👀 Watch & Memorize 4-Step Pattern..."
                 else -> "Tap the 4 tiles in order (${userSequence.size}/4)"
             },
             color = when {
                 isErrorFlash -> AppColorPalette.LossRed
-                isShowingPattern -> Color.White.copy(alpha = 0.6f)
+                isShowingPattern -> Color.White.copy(alpha = 0.7f)
                 else -> AppColorPalette.CyanCta
             },
             fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             fontFamily = interFamily
         )
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
-            modifier = Modifier.size(230.dp),
+            modifier = Modifier.size(240.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -426,23 +443,31 @@ private fun SoloMemoryComponent(
                 val isHighlighted = activeFlashTile == index || userSequence.contains(index)
                 val color by animateColorAsState(
                     targetValue = when {
-                        isErrorFlash -> AppColorPalette.LossRed.copy(alpha = 0.4f)
+                        isErrorFlash -> AppColorPalette.LossRed.copy(alpha = 0.5f)
                         isHighlighted -> AppColorPalette.CyanCta
                         else -> AppColorPalette.Surface
                     },
-                    animationSpec = tween(150)
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
+                )
+
+                val scale by animateFloatAsState(
+                    targetValue = if (isHighlighted) 1.06f else 1.0f,
+                    animationSpec = spring(stiffness = Spring.StiffnessLow)
                 )
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(14.dp))
+                        .scale(scale)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(color)
-                        .border(1.dp, if (isHighlighted) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                        .border(1.5.dp, if (isHighlighted) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
                         .clickable(enabled = !isShowingPattern && !isErrorFlash) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             userSequence.add(index)
                             val step = userSequence.size - 1
                             if (userSequence[step] != targetSequence[step]) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 isErrorFlash = true
                                 patternVersion++
                             } else if (userSequence.size == targetSequence.size) {
@@ -470,6 +495,7 @@ private fun SoloStroopComponent(
         Pair("GREEN", AppColorPalette.WinGreen),
         Pair("GOLD", AppColorPalette.GoldPremium)
     )
+    val haptic = LocalHapticFeedback.current
 
     var round by remember { mutableIntStateOf(1) }
     val targetPair = remember(round) { colors.random() }
@@ -478,28 +504,30 @@ private fun SoloStroopComponent(
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Text(
-            text = if (isError) "❌ Wrong! Tap the FONT COLOR, not the word!" else "Tap the button matching the FONT COLOR below:",
-            color = if (isError) AppColorPalette.LossRed else Color.White.copy(alpha = 0.7f),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = interFamily
+            text = if (isError) "❌ Wrong! Tap the FONT COLOR, not word!" else "Tap the button matching the FONT COLOR below:",
+            color = if (isError) AppColorPalette.LossRed else Color.White.copy(alpha = 0.75f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = interFamily,
+            textAlign = TextAlign.Center
         )
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(90.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .height(96.dp)
+                .clip(RoundedCornerShape(22.dp))
                 .background(AppColorPalette.Surface)
-                .border(2.dp, if (isError) AppColorPalette.LossRed else Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp)),
+                .border(2.dp, if (isError) AppColorPalette.LossRed else displayColor, RoundedCornerShape(22.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = targetPair.first,
                 color = displayColor,
-                fontSize = 38.sp,
+                fontSize = 42.sp,
                 fontWeight = FontWeight.W900,
-                fontFamily = titleFamily
+                fontFamily = titleFamily,
+                letterSpacing = 2.sp
             )
         }
 
@@ -511,17 +539,24 @@ private fun SoloStroopComponent(
         ) {
             items(colors.size) { idx ->
                 val colorOption = colors[idx]
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val btnScale by animateFloatAsState(if (isPressed) 0.94f else 1.0f)
+
                 Box(
                     modifier = Modifier
-                        .height(54.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(colorOption.second.copy(alpha = 0.15f))
-                        .border(1.5.dp, colorOption.second, RoundedCornerShape(14.dp))
-                        .clickable {
+                        .height(56.dp)
+                        .scale(btnScale)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(colorOption.second.copy(alpha = 0.18f))
+                        .border(2.dp, colorOption.second, RoundedCornerShape(16.dp))
+                        .clickable(interactionSource = interactionSource, indication = null) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (colorOption.second == displayColor) {
                                 isError = false
                                 onSuccess()
                             } else {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 isError = true
                                 round++
                             }
@@ -531,8 +566,8 @@ private fun SoloStroopComponent(
                     Text(
                         text = colorOption.first,
                         color = colorOption.second,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.W900,
                         fontFamily = interFamily
                     )
                 }
@@ -554,54 +589,69 @@ private fun SoloWordUnscrambleComponent(
     val originalWord = remember { wordList.random() }
     val scrambled = remember(originalWord) { originalWord.toList().shuffled().joinToString("") }
     val selectedIndices = remember { mutableStateListOf<Int>() }
+    val haptic = LocalHapticFeedback.current
 
     val currentInput = selectedIndices.map { scrambled[it] }.joinToString("")
 
     LaunchedEffect(currentInput) {
         if (currentInput.equals(originalWord, ignoreCase = true)) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             delay(150)
             onSuccess()
         }
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Unscramble the wake-up word", color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = interFamily)
+        Text("🔤 Unscramble the wake-up word:", color = Color.White.copy(alpha = 0.7f), fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
 
-        // Scrambled letters prompt
+        // Scrambled letters prompt tiles
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             scrambled.forEach { char ->
                 Box(
-                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(AppColorPalette.DeepSurface),
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AppColorPalette.DeepSurface)
+                        .border(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.4f), RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(char.toString(), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = titleFamily)
+                    Text(char.toString(), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black, fontFamily = titleFamily)
                 }
             }
         }
 
         // Active Input Box
         Row(
-            modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp)).background(AppColorPalette.Surface).border(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(AppColorPalette.Surface)
+                .border(1.5.dp, AppColorPalette.CyanCta, RoundedCornerShape(18.dp))
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = currentInput.ifEmpty { "Tap letters below..." },
+                text = currentInput.ifEmpty { "Tap letter bank..." },
                 color = if (currentInput.isEmpty()) Color.White.copy(alpha = 0.3f) else AppColorPalette.CyanCta,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.W800,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.W900,
                 fontFamily = titleFamily
             )
 
             if (selectedIndices.isNotEmpty()) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .clickable { selectedIndices.removeAt(selectedIndices.size - 1) }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White.copy(alpha = 0.12f))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedIndices.removeAt(selectedIndices.size - 1)
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text("⌫ Undo", color = Color.White, fontSize = 12.sp, fontFamily = interFamily)
+                    Text("⌫ Undo", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
                 }
             }
         }
@@ -610,13 +660,19 @@ private fun SoloWordUnscrambleComponent(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             scrambled.forEachIndexed { idx, letter ->
                 val isUsed = selectedIndices.contains(idx)
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val keyScale by animateFloatAsState(if (isPressed) 0.9f else 1.0f)
+
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isUsed) Color.White.copy(alpha = 0.03f) else AppColorPalette.CyanCta.copy(alpha = 0.15f))
-                        .border(1.dp, if (isUsed) Color.Transparent else AppColorPalette.CyanCta, RoundedCornerShape(12.dp))
-                        .clickable(enabled = !isUsed) {
+                        .size(50.dp)
+                        .scale(keyScale)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (isUsed) Color.White.copy(alpha = 0.04f) else AppColorPalette.CyanCta.copy(alpha = 0.2f))
+                        .border(1.5.dp, if (isUsed) Color.Transparent else AppColorPalette.CyanCta, RoundedCornerShape(14.dp))
+                        .clickable(enabled = !isUsed, interactionSource = interactionSource, indication = null) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             selectedIndices.add(idx)
                         },
                     contentAlignment = Alignment.Center
@@ -624,8 +680,8 @@ private fun SoloWordUnscrambleComponent(
                     Text(
                         text = letter.toString(),
                         color = if (isUsed) Color.White.copy(alpha = 0.2f) else Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.W900,
                         fontFamily = interFamily
                     )
                 }
@@ -645,17 +701,21 @@ private fun SoloShakeComponent(
 ) {
     var shakesCount by remember { mutableIntStateOf(0) }
     val requiredShakes = 15
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(shakesCount) {
-        if (shakesCount >= requiredShakes) onSuccess()
+        if (shakesCount >= requiredShakes) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSuccess()
+        }
     }
 
     val transition = rememberInfiniteTransition(label = "pulse")
-    val scale by transition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(tween(400, easing = EaseInOutSine), RepeatMode.Reverse),
-        label = "scale"
+    val pulseScale by transition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(tween(450, easing = EaseInOutSine), RepeatMode.Reverse),
+        label = "pulse"
     )
 
     val progress = (shakesCount.toFloat() / requiredShakes.toFloat()).coerceIn(0f, 1f)
@@ -664,27 +724,31 @@ private fun SoloShakeComponent(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(130.dp)
-                .scale(scale)
+                .size(140.dp)
+                .scale(pulseScale)
                 .clip(CircleShape)
                 .background(AppColorPalette.CyanCta.copy(alpha = 0.15f))
-                .border(2.dp, AppColorPalette.CyanCta, CircleShape)
-                .clickable { shakesCount++ }
+                .border(3.dp, AppColorPalette.CyanCta, CircleShape)
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    shakesCount++
+                }
         ) {
-            Text("📱", fontSize = 54.sp)
+            Text("📱", fontSize = 58.sp)
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Shake / Tap rapidly to charge energy!", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
-            Text("${(progress * 100).toInt()}% Charged ($shakesCount / $requiredShakes)", color = AppColorPalette.CyanCta, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = interFamily)
+            Text("⚡ Tap/Shake rapidly to charge battery!", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, fontFamily = interFamily)
+            Text("${(progress * 100).toInt()}% Charged ($shakesCount / $requiredShakes)", color = AppColorPalette.CyanCta, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = interFamily)
         }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(18.dp)
+                .height(20.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.08f))
+                .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
         ) {
             Box(
                 modifier = Modifier
@@ -709,46 +773,56 @@ private fun SoloNumberOrderComponent(
     var nextExpected by remember { mutableIntStateOf(1) }
     val numbers = remember { (1..6).shuffled() }
     var isError by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
-            text = if (isError) "❌ Wrong order! Tap #$nextExpected next!" else "Tap numbers in order: #$nextExpected ➔ 6",
+            text = if (isError) "❌ Wrong sequence! Tap #$nextExpected next!" else "Tap numbers ascending: #$nextExpected ➔ 6",
             color = if (isError) AppColorPalette.LossRed else AppColorPalette.CyanCta,
             fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             fontFamily = interFamily
         )
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
-            modifier = Modifier.size(230.dp),
+            modifier = Modifier.size(240.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(numbers.size) { idx ->
                 val num = numbers[idx]
                 val isCleared = num < nextExpected
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val scale by animateFloatAsState(if (isPressed) 0.92f else 1.0f)
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .scale(scale)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(if (isCleared) AppColorPalette.WinGreen.copy(alpha = 0.2f) else AppColorPalette.Surface)
-                        .border(1.5.dp, if (isCleared) AppColorPalette.WinGreen else Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-                        .clickable(enabled = !isCleared) {
+                        .background(if (isCleared) AppColorPalette.WinGreen.copy(alpha = 0.25f) else AppColorPalette.Surface)
+                        .border(1.5.dp, if (isCleared) AppColorPalette.WinGreen else Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+                        .clickable(enabled = !isCleared, interactionSource = interactionSource, indication = null) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (num == nextExpected) {
                                 isError = false
-                                if (nextExpected == 6) onSuccess() else nextExpected++
+                                if (nextExpected == 6) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onSuccess()
+                                } else nextExpected++
                             } else {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 isError = true
                             }
                         },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = num.toString(),
+                        text = if (isCleared) "✓" else num.toString(),
                         color = if (isCleared) AppColorPalette.WinGreen else Color.White,
-                        fontSize = 26.sp,
+                        fontSize = 28.sp,
                         fontWeight = FontWeight.W900,
                         fontFamily = titleFamily
                     )
@@ -776,40 +850,49 @@ private fun SoloOddOneOutComponent(
 
     val currentSet = remember { sets.random() }
     var isError by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
-            text = if (isError) "❌ Try again! Find the intruder emoji!" else "Find the odd intruder emoji!",
+            text = if (isError) "❌ Try again! Find intruder emoji!" else "🔍 Find the intruder emoji!",
             color = if (isError) AppColorPalette.LossRed else AppColorPalette.CyanCta,
             fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             fontFamily = interFamily
         )
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
-            modifier = Modifier.size(230.dp),
+            modifier = Modifier.size(240.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(currentSet.first.size) { idx ->
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val scale by animateFloatAsState(if (isPressed) 0.9f else 1.0f)
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp))
+                        .scale(scale)
+                        .clip(RoundedCornerShape(18.dp))
                         .background(AppColorPalette.Surface)
-                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-                        .clickable {
+                        .border(1.5.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
+                        .clickable(interactionSource = interactionSource, indication = null) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (idx == currentSet.second) {
                                 isError = false
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onSuccess()
                             } else {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 isError = true
                             }
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(currentSet.first[idx], fontSize = 32.sp)
+                    Text(currentSet.first[idx], fontSize = 34.sp)
                 }
             }
         }
@@ -817,7 +900,7 @@ private fun SoloOddOneOutComponent(
 }
 
 // -----------------------------------------------------------------------------
-// 8. TILE SWAP TASK
+// 8. SLIDING TILES TASK
 // -----------------------------------------------------------------------------
 @Composable
 private fun SoloSlidingTileComponent(
@@ -827,9 +910,11 @@ private fun SoloSlidingTileComponent(
 ) {
     val currentTiles = remember { mutableStateListOf(3, 1, 4, 2) }
     var selectedIndex by remember { mutableIntStateOf(-1) }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(currentTiles.toList()) {
         if (currentTiles.toList() == listOf(1, 2, 3, 4)) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             delay(150)
             onSuccess()
         }
@@ -837,9 +922,9 @@ private fun SoloSlidingTileComponent(
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
-            text = if (selectedIndex == -1) "Tap any tile to select, then tap another to swap!" else "Tap destination tile to swap!",
+            text = if (selectedIndex == -1) "🧱 Tap tile to select, then tap target tile to swap!" else "🔄 Tap target tile to swap into place!",
             color = AppColorPalette.CyanCta,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = interFamily,
             textAlign = TextAlign.Center
@@ -847,21 +932,26 @@ private fun SoloSlidingTileComponent(
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            modifier = Modifier.size(200.dp),
+            modifier = Modifier.size(210.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(4) { idx ->
                 val num = currentTiles[idx]
                 val isSelected = selectedIndex == idx
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val scale by animateFloatAsState(if (isSelected) 1.05f else if (isPressed) 0.95f else 1.0f)
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSelected) AppColorPalette.CyanCta.copy(alpha = 0.3f) else AppColorPalette.Surface)
-                        .border(1.5.dp, if (isSelected) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-                        .clickable {
+                        .scale(scale)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(if (isSelected) AppColorPalette.CyanCta.copy(alpha = 0.35f) else AppColorPalette.Surface)
+                        .border(2.dp, if (isSelected) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
+                        .clickable(interactionSource = interactionSource, indication = null) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (selectedIndex == -1) {
                                 selectedIndex = idx
                             } else if (selectedIndex == idx) {
@@ -875,7 +965,7 @@ private fun SoloSlidingTileComponent(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(num.toString(), color = if (isSelected) AppColorPalette.CyanCta else Color.White, fontSize = 32.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
+                    Text(num.toString(), color = if (isSelected) AppColorPalette.CyanCta else Color.White, fontSize = 34.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
                 }
             }
         }
@@ -883,7 +973,7 @@ private fun SoloSlidingTileComponent(
 }
 
 // -----------------------------------------------------------------------------
-// 9. BED-FRIENDLY ORB FOCUS TASK
+// 9. ORB FOCUS TASK
 // -----------------------------------------------------------------------------
 @Composable
 private fun SoloBalanceMazeComponent(
@@ -894,46 +984,54 @@ private fun SoloBalanceMazeComponent(
     var tapsLeft by remember { mutableIntStateOf(4) }
     var orbXOffset by remember { mutableIntStateOf(0) }
     var orbYOffset by remember { mutableIntStateOf(0) }
+    val haptic = LocalHapticFeedback.current
+
+    val animatedX by animateDpAsState(targetValue = orbXOffset.dp, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+    val animatedY by animateDpAsState(targetValue = orbYOffset.dp, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
 
     LaunchedEffect(tapsLeft) {
-        if (tapsLeft <= 0) onSuccess()
+        if (tapsLeft <= 0) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSuccess()
+        }
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Text("Tap the glowing orb as it jumps!", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp, fontFamily = interFamily)
+        Text("🎯 Focus & tap glowing orb as it jumps!", color = Color.White.copy(alpha = 0.75f), fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
 
         Box(
             modifier = Modifier
-                .size(220.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .size(230.dp)
+                .clip(RoundedCornerShape(26.dp))
                 .background(AppColorPalette.Surface)
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp)),
+                .border(1.5.dp, AppColorPalette.CyanCta.copy(alpha = 0.3f), RoundedCornerShape(26.dp)),
             contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
-                    .offset(x = orbXOffset.dp, y = orbYOffset.dp)
-                    .size(54.dp)
+                    .offset(x = animatedX, y = animatedY)
+                    .size(56.dp)
                     .clip(CircleShape)
                     .background(AppColorPalette.CyanCta)
-                    .border(2.dp, Color.White, CircleShape)
+                    .border(2.5.dp, Color.White, CircleShape)
                     .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         tapsLeft--
-                        orbXOffset = (-60..60).random()
-                        orbYOffset = (-60..60).random()
+                        orbXOffset = (-65..65).random()
+                        orbYOffset = (-65..65).random()
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text("🎯", fontSize = 24.sp)
+                Text("🎯", fontSize = 26.sp)
             }
         }
 
-        Text("$tapsLeft focus taps remaining", color = AppColorPalette.CyanCta, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+        Text("$tapsLeft target taps remaining", color = AppColorPalette.CyanCta, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, fontFamily = interFamily)
     }
 }
 
 // -----------------------------------------------------------------------------
-// 10. BED-FRIENDLY RAPID BED TAP TASK
+// 10. RAPID BED TAP TASK
 // -----------------------------------------------------------------------------
 @Composable
 private fun SoloBedTapComponent(
@@ -943,31 +1041,60 @@ private fun SoloBedTapComponent(
 ) {
     var tapCount by remember { mutableIntStateOf(0) }
     val requiredTaps = 12
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(tapCount) {
-        if (tapCount >= requiredTaps) onSuccess()
+        if (tapCount >= requiredTaps) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSuccess()
+        }
     }
 
+    val progress = (tapCount.toFloat() / requiredTaps.toFloat()).coerceIn(0f, 1f)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val padScale by animateFloatAsState(if (isPressed) 0.88f else 1.0f)
+
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Rapidly tap button in bed to wake up!", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
+        Text("👆 Rapidly tap the bed-pad to wake up!", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
 
         Box(
             modifier = Modifier
-                .size(140.dp)
+                .size(150.dp)
+                .scale(padScale)
                 .clip(CircleShape)
-                .background(AppColorPalette.WinGreen.copy(alpha = 0.15f))
-                .border(3.dp, AppColorPalette.WinGreen, CircleShape)
-                .clickable { tapCount++ },
+                .background(AppColorPalette.WinGreen.copy(alpha = 0.18f))
+                .border(3.5.dp, AppColorPalette.WinGreen, CircleShape)
+                .clickable(interactionSource = interactionSource, indication = null) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    tapCount++
+                },
             contentAlignment = Alignment.Center
         ) {
-            Text("👆", fontSize = 54.sp)
+            Text("👆", fontSize = 58.sp)
         }
 
         Text("Progress: $tapCount / $requiredTaps Taps", color = AppColorPalette.WinGreen, fontSize = 16.sp, fontWeight = FontWeight.Black, fontFamily = interFamily)
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(18.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.08f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(AppColorPalette.CyanCta, AppColorPalette.WinGreen)))
+            )
+        }
     }
 }
 
-// Helper Numpad
+// Helper Numpad with Press Scale & Haptic Feedback
 @Composable
 private fun SoloNumpad(
     onNumberClick: (String) -> Unit,
@@ -992,17 +1119,22 @@ private fun SoloNumpad(
                 modifier = Modifier.fillMaxWidth(0.85f)
             ) {
                 for (item in row) {
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isPressed by interactionSource.collectIsPressedAsState()
+                    val keyScale by animateFloatAsState(if (isPressed) 0.92f else 1.0f)
+
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .height(54.dp)
+                            .scale(keyScale)
+                            .clip(RoundedCornerShape(16.dp))
                             .background(if (item.isEmpty()) Color.Transparent else AppColorPalette.DeepSurface)
                             .then(
-                                if (item.isNotEmpty()) Modifier.border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                                if (item.isNotEmpty()) Modifier.border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                                 else Modifier
                             )
-                            .clickable(enabled = item.isNotEmpty()) {
+                            .clickable(enabled = item.isNotEmpty(), interactionSource = interactionSource, indication = null) {
                                 if (item == "DEL") onDeleteClick() else onNumberClick(item)
                             },
                         contentAlignment = Alignment.Center
@@ -1011,15 +1143,15 @@ private fun SoloNumpad(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.Backspace,
                                 contentDescription = "Delete",
-                                tint = Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.size(20.dp)
+                                tint = Color.White.copy(alpha = 0.75f),
+                                modifier = Modifier.size(22.dp)
                             )
                         } else {
                             Text(
                                 text = item,
                                 color = Color.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.W700,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.W800,
                                 fontFamily = titleFamily
                             )
                         }

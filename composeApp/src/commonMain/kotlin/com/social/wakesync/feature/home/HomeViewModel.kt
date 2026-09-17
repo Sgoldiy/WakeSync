@@ -487,9 +487,34 @@ class HomeViewModel : ViewModel() {
     }
 
     fun recordAlarmLoss(alarmId: String, mode: String) {
+        val previousStreak = _uiState.value.streak
         _uiState.update { it.copy(streak = 0, losses = it.losses + 1) }
         viewModelScope.launch {
             homeRepository.recordAlarmResult(alarmId, mode, false)
+
+            val alarmTime = _uiState.value.nextAlarmTime.ifEmpty { "07:00 AM" }
+            val challenge = AlarmState.activeAlarmChallenge.ifEmpty { "Speed Math" }
+            val punishmentStr = _activePunishment.value?.let { "${it.punishmentEmoji} ${it.punishmentType}" } ?: "20 pushups 💪"
+
+            val username = _uiState.value.userName.ifEmpty { "user" }
+            val genZCaptions = listOf(
+                "@$username slept through $alarmTime alarm 😴",
+                "Caught sleeping in 4K resolution 💀 (Missed $alarmTime)",
+                "Defaulted on wake-up duty! Penalty: $punishmentStr 📢",
+                "Streak reset to 0. Absolute tragedy 📉",
+                "Alarm rang for 10 minutes straight. Down bad 🚨"
+            )
+            val randomCaption = genZCaptions.random()
+
+            // Auto-post shame receipt to social penalty wall
+            homeRepository.postShameReceipt(
+                alarmTime = alarmTime,
+                challengeName = challenge,
+                streakLost = previousStreak,
+                punishmentText = punishmentStr,
+                customCaption = randomCaption
+            )
+
             // Assign punishment for Duo/Group mode
             if (mode == "Duo" || mode == "Group") {
                 val challengerUsername = AlarmState.activeAlarmPartnerUsername ?: "Partner"
@@ -508,6 +533,24 @@ class HomeViewModel : ViewModel() {
                 ).onSuccess { punishment ->
                     _activePunishment.value = punishment
                 }
+            }
+        }
+    }
+
+    fun broadcastShameReceipt(customCaption: String? = null, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val alarmTime = _uiState.value.nextAlarmTime.ifEmpty { "07:00 AM" }
+            val challenge = AlarmState.activeAlarmChallenge.ifEmpty { "Speed Math" }
+            val punishmentStr = _activePunishment.value?.let { "${it.punishmentEmoji} ${it.punishmentType}" } ?: "20 pushups 💪"
+
+            homeRepository.postShameReceipt(
+                alarmTime = alarmTime,
+                challengeName = challenge,
+                streakLost = AlarmState.previousStreak,
+                punishmentText = punishmentStr,
+                customCaption = customCaption
+            ).onSuccess {
+                onComplete()
             }
         }
     }

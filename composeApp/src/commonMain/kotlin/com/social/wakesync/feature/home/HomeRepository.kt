@@ -40,6 +40,13 @@ interface HomeRepository {
     fun getGroupLeaderboard(groupId: String = "Morning Crew"): Flow<List<GroupMember>>
     fun getSocialFeed(): Flow<List<FeedPost>>
     suspend fun postToFeed(content: String, badge: String): Result<Unit>
+    suspend fun postShameReceipt(
+        alarmTime: String,
+        challengeName: String,
+        streakLost: Int,
+        punishmentText: String,
+        customCaption: String? = null
+    ): Result<Unit>
     fun getNotifications(): Flow<List<FeedNotification>>
     fun getStories(): Flow<List<StoryItem>>
     suspend fun postStory(caption: String, badgeText: String, badgeColorHex: String, bgStartHex: String, bgEndHex: String): Result<Unit>
@@ -60,7 +67,11 @@ data class SoundMetadata(
     val id: String = "",
     val name: String = "",
     val url: String = "",
-    val category: String = "Solo" // e.g., "Solo", "Battle", "Chill"
+    val category: String = "Phonk", // "Phonk", "HyperPop", "8Bit", "Meme"
+    val durationSeconds: Int = 15,
+    val emoji: String = "🎵",
+    val pitch: Float = 1.0f,
+    val speed: Float = 1.0f
 )
 
 data class Punishment(
@@ -99,7 +110,9 @@ data class AlarmData(
     val partnerUid: String? = null, // For Duo/Group shared alarm synchronization
     val partnerUsername: String? = null, // Username of tagged partner (e.g. maya.rises)
     val mathDifficulty: String = "Medium", // "Easy" (1 q), "Medium" (2 q), "Hard" (3 q)
-    val bondName: String? = null
+    val bondName: String? = null,
+    val pitch: Float = 1.0f,
+    val speed: Float = 1.0f
 )
 
 data class HomeStats(
@@ -131,7 +144,12 @@ data class FeedPost(
     val badgeColorHex: String = "#22C55E",
     val streak: Int = 0,
     val createdAt: Long = 0L,
-    val reactions: Map<String, Int> = emptyMap()
+    val reactions: Map<String, Int> = emptyMap(),
+    val isShameReceipt: Boolean = false,
+    val missedTime: String = "",
+    val challengeName: String = "",
+    val punishmentText: String = "",
+    val shameCaption: String = ""
 )
 
 data class FeedNotification(

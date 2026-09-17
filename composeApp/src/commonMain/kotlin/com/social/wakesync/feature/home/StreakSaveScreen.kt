@@ -65,9 +65,17 @@ private data class ConfettiParticle(
 fun StreakSaveScreen(
     streakDays: Int = 24,
     finishPosition: Int = 1,
-    totalParticipants: Int = 5,
-    sleepingFriends: List<String> = listOf("🦁", "🐻", "🐱"),
-    friendsLostCount: Int = 3,
+    totalParticipants: Int = 2,
+    sleepingFriends: List<String> = listOf("🦁", "🐻"),
+    friendsLostCount: Int = 0,
+    rivalName: String = "alex",
+    rivalAvatar: String = "🦁",
+    userAvatar: String = "🤯",
+    userSolveTimeSeconds: Float = 12.4f,
+    rivalSolveTimeSeconds: Float = 16.6f,
+    xpGained: Int = 100,
+    streakMultiplier: Float = 1.5f,
+    isDuoOrGroup: Boolean = true,
     onShareClick: () -> Unit = {},
     onBackToHome: () -> Unit = {},
     titleFamily: FontFamily,
@@ -261,49 +269,67 @@ fun StreakSaveScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Still sleeping card
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
-                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                Text(
-                    text = "STILL SLEEPING 💀",
-                    color = Color.White.copy(alpha = 0.35f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.W500,
-                    fontFamily = interFamily,
-                    letterSpacing = 0.8.sp
+            // Duo Duel Speed Matrix Card
+            if (isDuoOrGroup) {
+                DuoSpeedMatrixCard(
+                    rivalName = rivalName,
+                    rivalAvatar = rivalAvatar,
+                    userAvatar = userAvatar,
+                    userSolveTimeSeconds = userSolveTimeSeconds,
+                    rivalSolveTimeSeconds = rivalSolveTimeSeconds,
+                    xpGained = xpGained,
+                    streakMultiplier = streakMultiplier,
+                    titleFamily = titleFamily,
+                    interFamily = interFamily
                 )
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Overlapping friend avatars
-                    sleepingFriends.forEachIndexed { index, emoji ->
-                        Box(
-                            modifier = Modifier
-                                .offset(x = (-(index * 8)).dp)
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(AppColorPalette.Surface)
-                                .border(2.dp, AppColorPalette.LossRed, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = emoji, fontSize = 16.sp)
-                        }
-                    }
+            }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Still sleeping card
+            if (sleepingFriends.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White.copy(alpha = 0.04f))
+                        .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
                     Text(
-                        text = "$friendsLostCount friends lost",
-                        color = Color.White.copy(alpha = 0.4f),
-                        fontSize = 12.sp,
+                        text = "STILL SLEEPING 💀",
+                        color = Color.White.copy(alpha = 0.35f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.W500,
                         fontFamily = interFamily,
-                        modifier = Modifier.padding(start = (12 - (sleepingFriends.size - 1) * 8).coerceAtLeast(4).dp)
+                        letterSpacing = 0.8.sp
                     )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        sleepingFriends.forEachIndexed { index, emoji ->
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = (-(index * 8)).dp)
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(AppColorPalette.Surface)
+                                    .border(2.dp, AppColorPalette.LossRed, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = emoji, fontSize = 16.sp)
+                            }
+                        }
+
+                        Text(
+                            text = "$friendsLostCount friends lost",
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontSize = 12.sp,
+                            fontFamily = interFamily,
+                            modifier = Modifier.padding(start = (12 - (sleepingFriends.size - 1) * 8).coerceAtLeast(4).dp)
+                        )
+                    }
                 }
             }
 
@@ -361,6 +387,261 @@ fun StreakSaveScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun DuoSpeedMatrixCard(
+    rivalName: String,
+    rivalAvatar: String,
+    userAvatar: String,
+    userSolveTimeSeconds: Float,
+    rivalSolveTimeSeconds: Float,
+    xpGained: Int,
+    streakMultiplier: Float,
+    titleFamily: FontFamily,
+    interFamily: FontFamily
+) {
+    val timeDiff = (rivalSolveTimeSeconds - userSolveTimeSeconds).coerceAtLeast(0.1f)
+    val formattedDiff = ((timeDiff * 10).toInt() / 10f).toString()
+
+    androidx.compose.material3.Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(22.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = AppColorPalette.Surface),
+        border = androidx.compose.foundation.BorderStroke(
+            1.5.dp,
+            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                listOf(AppColorPalette.CyanCta, AppColorPalette.GoldPremium)
+            )
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("⚔️", fontSize = 16.sp)
+                    Text(
+                        text = "DUO DUEL SPEED MATRIX",
+                        color = AppColorPalette.CyanCta,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = interFamily,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(AppColorPalette.GoldPremium.copy(alpha = 0.15f))
+                        .border(1.dp, AppColorPalette.GoldPremium, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "🚀 ${streakMultiplier}x XP Boost",
+                        color = AppColorPalette.GoldPremium,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = interFamily
+                    )
+                }
+            }
+
+            // Headline Banner
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AppColorPalette.WinGreen.copy(alpha = 0.12f))
+                    .border(1.dp, AppColorPalette.WinGreen.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .padding(vertical = 8.dp, horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⚡ You beat @$rivalName by ${formattedDiff}s! (+${xpGained} XP)",
+                    color = AppColorPalette.WinGreen,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = interFamily,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            // Head to Head Comparison Matrix
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // User Card (Winner)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AppColorPalette.CyanCta.copy(alpha = 0.1f))
+                        .border(1.dp, AppColorPalette.CyanCta, RoundedCornerShape(16.dp))
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(AppColorPalette.CyanCta.copy(alpha = 0.2f))
+                            .border(2.dp, AppColorPalette.CyanCta, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(userAvatar, fontSize = 22.sp)
+                    }
+
+                    Text(
+                        text = "You",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = interFamily
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(AppColorPalette.CyanCta)
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "⏱️ ${userSolveTimeSeconds}s",
+                            color = Color.Black,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = interFamily
+                        )
+                    }
+
+                    Text(
+                        text = "👑 1st Place",
+                        color = AppColorPalette.WinGreen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = interFamily
+                    )
+                }
+
+                // VS Divider Badge
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(AppColorPalette.VoidBg)
+                        .border(1.dp, AppColorPalette.GoldPremium, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "VS",
+                        color = AppColorPalette.GoldPremium,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = interFamily
+                    )
+                }
+
+                // Rival Card (Runner-up)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White.copy(alpha = 0.04f))
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.05f))
+                            .border(1.5.dp, Color.White.copy(alpha = 0.2f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(rivalAvatar, fontSize = 22.sp)
+                    }
+
+                    Text(
+                        text = "@$rivalName",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = interFamily,
+                        maxLines = 1
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "⏱️ ${rivalSolveTimeSeconds}s",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = interFamily
+                        )
+                    }
+
+                    Text(
+                        text = "🥈 2nd Place",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = interFamily
+                    )
+                }
+            }
+
+            // Badges Tag Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("⚡ Lightning Reflexes", "🔥 Duo Bond Saved", "🏆 Top Waker").forEach { badge ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.04f))
+                            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                            .padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = badge,
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = interFamily
+                        )
+                    }
+                }
+            }
         }
     }
 }

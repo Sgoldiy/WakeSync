@@ -21,8 +21,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -89,10 +91,15 @@ fun SetAlarmScreen(
     var selectedMode by remember { mutableStateOf(if (preselectedRival != null) "Duo" else "Solo") }
     var selectedChallenge by remember { mutableStateOf("Math") }
     var selectedCategoryFilter by remember { mutableStateOf("ALL") }
+    var demoGameTarget by remember { mutableStateOf<GenZGameItem?>(null) }
     var selectedMathDifficulty by remember { mutableStateOf("Medium") }
     val selectedDays = remember { mutableStateListOf(0, 1, 2, 3, 4) }
     var selectedPenalty by remember { mutableStateOf("shame") }
     var bondName by remember { mutableStateOf("") }
+    var activeSound by remember(selectedSound) {
+        mutableStateOf(selectedSound ?: DefaultGenZSoundCatalog.first())
+    }
+    var showAudioLibraryModal by remember { mutableStateOf(false) }
 
     // Duo / Group User Search Bottom Sheet State
     var showAddParticipantsSheet by remember { mutableStateOf(false) }
@@ -533,9 +540,20 @@ fun SetAlarmScreen(
                             game = game,
                             isSelected = selectedChallenge == game.id,
                             onClick = { selectedChallenge = game.id },
+                            onDemoClick = { demoGameTarget = game },
                             interFamily = interFamily
                         )
                     }
+                }
+
+                // Full Screen Practice Demo Arcade
+                demoGameTarget?.let { game ->
+                    DemoGameFullScreen(
+                        game = game,
+                        onDismiss = { demoGameTarget = null },
+                        titleFamily = titleFamily,
+                        interFamily = interFamily
+                    )
                 }
 
                 // ONLY Math displays the Level 1, Level 2, Level 3 sub-selector bar!
@@ -594,6 +612,113 @@ fun SetAlarmScreen(
                             }
                         }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // 🔊 ALARM SOUND & AUDIO ENGINE SECTION
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF131724)),
+                    border = BorderStroke(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.2f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(text = "🔊", fontSize = 16.sp)
+                                Text(
+                                    text = "ALARM SOUNDSCAPE",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = titleFamily,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+
+                            Text(
+                                text = activeSound.category,
+                                color = AppColorPalette.CyanCta,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontFamily = interFamily,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(AppColorPalette.CyanCta.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.04f))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(text = activeSound.emoji, fontSize = 22.sp)
+                                Column {
+                                    Text(
+                                        text = activeSound.name,
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = interFamily
+                                    )
+                                    Text(
+                                        text = "🎛️ Pitch: ${activeSound.pitch}x · ⚡ Speed: ${activeSound.speed}x",
+                                        color = Color.White.copy(alpha = 0.5f),
+                                        fontSize = 11.sp,
+                                        fontFamily = interFamily
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(AppColorPalette.CyanCta)
+                                    .clickable { showAudioLibraryModal = true }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Change 🎧",
+                                    color = Color.Black,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = interFamily
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (showAudioLibraryModal) {
+                    CyberAudioLibraryModal(
+                        onDismiss = { showAudioLibraryModal = false },
+                        onSelectSound = { sound ->
+                            activeSound = sound
+                            onSoundSelected(sound)
+                        },
+                        titleFamily = titleFamily,
+                        interFamily = interFamily,
+                        initialSound = activeSound
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -1159,6 +1284,7 @@ fun GenZGameCard(
     game: GenZGameItem,
     isSelected: Boolean,
     onClick: () -> Unit,
+    onDemoClick: () -> Unit,
     interFamily: FontFamily
 ) {
     Box(
@@ -1244,19 +1370,219 @@ fun GenZGameCard(
                 )
             }
 
-            // Bottom Row: Time / Category Badge
+            // Bottom Row: Time Badge & 🎮 Try Demo Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "⏱️ ${game.estTime}",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = interFamily
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(game.accentColor.copy(alpha = 0.18f))
+                        .border(1.dp, game.accentColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .clickable { onDemoClick() }
+                        .padding(horizontal = 7.dp, vertical = 3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "🎮 Try",
+                        color = game.accentColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = interFamily
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DemoGameFullScreen(
+    game: GenZGameItem,
+    onDismiss: () -> Unit,
+    titleFamily: FontFamily,
+    interFamily: FontFamily
+) {
+    var isCompleted by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppColorPalette.VoidBg)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Header Row: Exit Button & Practice Mode Badge
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.White.copy(alpha = 0.05f))
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .clickable { onDismiss() }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("←", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Exit Practice", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+                }
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(game.accentColor.copy(alpha = 0.15f))
+                        .border(1.dp, game.accentColor, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("🎮", fontSize = 14.sp)
+                    Text(
+                        text = "PRACTICE DEMO",
+                        color = game.accentColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = titleFamily,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+
+            // Title Header
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(game.emoji, fontSize = 32.sp)
+                    Text(
+                        text = game.name,
+                        color = Color.White,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.W900,
+                        fontFamily = titleFamily
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Unlimited time · Practice round before setting alarm",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = interFamily
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Main Interactive Full Screen Game Canvas
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(AppColorPalette.Surface)
+                    .border(1.5.dp, game.accentColor.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isCompleted) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text("🏆", fontSize = 64.sp)
+                        Text(
+                            text = "DEMO COMPLETED!",
+                            color = AppColorPalette.WinGreen,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.W900,
+                            fontFamily = titleFamily
+                        )
+                        Text(
+                            text = "Great job! You are ready to crush this alarm.",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 14.sp,
+                            fontFamily = interFamily,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(
+                                onClick = { isCompleted = false },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Text("Play Again 🔄", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+                            }
+                            Button(
+                                onClick = onDismiss,
+                                colors = ButtonDefaults.buttonColors(containerColor = AppColorPalette.CyanCta),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Text("Set Alarm ⏰", color = Color.Black, fontWeight = FontWeight.Bold, fontFamily = interFamily)
+                            }
+                        }
+                    }
+                } else {
+                    AlarmPuzzleSolo(
+                        onDismiss = { isCompleted = true },
+                        onFailure = { isCompleted = false },
+                        titleFamily = titleFamily,
+                        interFamily = interFamily,
+                        challengeName = if (game.id == "Mystery") listOf("Math", "Memory", "Stroop", "Word Scramble", "Shake", "Speed Tap", "Odd One Out", "Sliding Tiles", "Orb Focus", "Rapid Tap").random() else game.id
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Bottom Tip Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "⏱️ ${game.estTime}",
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "💡 Solve the practice puzzle above to complete the demo!",
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
                     fontFamily = interFamily
                 )
             }

@@ -101,7 +101,12 @@ fun SocialFeedScreen(
                     badgeColor = badgeColor,
                     content = post.content,
                     reactions = post.reactions.map { it.key to it.value },
-                    avatarBorderColor = badgeColor
+                    avatarBorderColor = badgeColor,
+                    isShameReceipt = post.isShameReceipt || post.badgeText == "shame" || post.badgeText == "loss",
+                    missedTime = post.missedTime,
+                    challengeName = post.challengeName,
+                    punishmentText = post.punishmentText,
+                    shameCaption = post.shameCaption.ifEmpty { post.content }
                 )
             }
         } else {
@@ -137,11 +142,16 @@ fun SocialFeedScreen(
                     avatar = "🐱",
                     timeAgo = "1h ago",
                     streak = 0,
-                    badgeText = "loss",
+                    badgeText = "shame",
                     badgeColor = Color(0xFFFF3D71),
-                    content = "Slept through again. Assigned: 20 pushups.",
-                    reactions = listOf("💀" to 9, "😂" to 5),
-                    avatarBorderColor = Color(0xFFFF3D71)
+                    content = "Slept through 07:30 AM alarm 😴",
+                    reactions = listOf("💀" to 9, "😂" to 5, "🤡" to 3, "🚨" to 4),
+                    avatarBorderColor = Color(0xFFFF3D71),
+                    isShameReceipt = true,
+                    missedTime = "07:30 AM",
+                    challengeName = "Speed Math",
+                    punishmentText = "20 pushups 💪",
+                    shameCaption = "@nocturnaleve slept through 07:30 AM alarm 😴 (Caught in 4K 💀)"
                 ),
                 FeedItem(
                     id = "4",
@@ -280,28 +290,51 @@ fun SocialFeedScreen(
                     }
                 } else {
                     items(feedItems, key = { it.id }) { item ->
-                        ActivityCard(
-                            item = item,
-                            titleFamily = titleFamily,
-                            interFamily = interFamily,
-                            onReplyClick = { replyingToItem = item },
-                            onReactionClick = { emoji ->
-                                val reactionKey = "${item.id}_$emoji"
-                                if (reactionKey !in reactedEmojis) {
-                                    reactedEmojis = reactedEmojis + reactionKey
-                                    feedItems = feedItems.map { fit ->
-                                        if (fit.id == item.id) {
-                                            fit.copy(
-                                                reactions = fit.reactions.map { (e, c) ->
-                                                    if (e == emoji) e to (c + 1) else e to c
-                                                }
-                                            )
-                                        } else fit
+                        if (item.isShameReceipt || item.badgeText == "shame" || item.badgeText == "loss") {
+                            ShameReceiptCard(
+                                item = item,
+                                titleFamily = titleFamily,
+                                interFamily = interFamily,
+                                onReactionClick = { emoji ->
+                                    val reactionKey = "${item.id}_$emoji"
+                                    if (reactionKey !in reactedEmojis) {
+                                        reactedEmojis = reactedEmojis + reactionKey
+                                        feedItems = feedItems.map { fit ->
+                                            if (fit.id == item.id) {
+                                                val existingReactions = fit.reactions.toMap()
+                                                val updatedMap = existingReactions.toMutableMap()
+                                                updatedMap[emoji] = (updatedMap[emoji] ?: 0) + 1
+                                                fit.copy(reactions = updatedMap.toList())
+                                            } else fit
+                                        }
                                     }
-                                }
-                            },
-                            onUserClick = onUserClick
-                        )
+                                },
+                                onUserClick = onUserClick
+                            )
+                        } else {
+                            ActivityCard(
+                                item = item,
+                                titleFamily = titleFamily,
+                                interFamily = interFamily,
+                                onReplyClick = { replyingToItem = item },
+                                onReactionClick = { emoji ->
+                                    val reactionKey = "${item.id}_$emoji"
+                                    if (reactionKey !in reactedEmojis) {
+                                        reactedEmojis = reactedEmojis + reactionKey
+                                        feedItems = feedItems.map { fit ->
+                                            if (fit.id == item.id) {
+                                                fit.copy(
+                                                    reactions = fit.reactions.map { (e, c) ->
+                                                        if (e == emoji) e to (c + 1) else e to c
+                                                    }
+                                                )
+                                            } else fit
+                                        }
+                                    }
+                                },
+                                onUserClick = onUserClick
+                            )
+                        }
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
@@ -618,6 +651,232 @@ fun ActivityCard(
 }
 
 @Composable
+fun ShameReceiptCard(
+    item: FeedItem,
+    titleFamily: FontFamily,
+    interFamily: FontFamily,
+    onReactionClick: (String) -> Unit,
+    onUserClick: (String) -> Unit
+) {
+    val crimson = Color(0xFFFF3D71)
+    val missedTimeStr = if (item.missedTime.isEmpty()) "07:30 AM" else item.missedTime
+    val challengeStr = if (item.challengeName.isEmpty()) "Speed Math" else item.challengeName
+    val streakLostStr = if (item.streak > 0) "${item.streak} -> 0" else "Broken 📉"
+    val punishmentStr = if (item.punishmentText.isEmpty()) "20 pushups" else item.punishmentText
+    val captionStr = if (item.shameCaption.isNotEmpty()) item.shameCaption else item.content
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF190D18)),
+        border = BorderStroke(1.5.dp, crimson.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            // Receipt Header Stamp & Barcode
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(crimson.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(text = "🚨", fontSize = 16.sp)
+                    Text(
+                        text = "MISSED ALARM RECEIPT",
+                        color = crimson,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = titleFamily,
+                        letterSpacing = 1.sp
+                    )
+                }
+                Text(
+                    text = "|||| | ||||| ||",
+                    color = crimson.copy(alpha = 0.4f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Offender Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .border(1.5.dp, crimson, CircleShape)
+                            .padding(1.5.dp)
+                            .clip(CircleShape)
+                            .background(crimson.copy(alpha = 0.15f))
+                            .clickable { onUserClick(item.username) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = item.avatar, fontSize = 20.sp)
+                    }
+
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = item.username,
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = interFamily,
+                                modifier = Modifier.clickable { onUserClick(item.username) }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "OFFENDER 💀",
+                                color = crimson,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontFamily = interFamily,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(crimson.copy(alpha = 0.2f))
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                        Text(
+                            text = item.timeAgo,
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontSize = 11.sp,
+                            fontFamily = interFamily
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Perforated Details Table
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .border(1.dp, crimson.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "⏰ Missed: $missedTimeStr",
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = interFamily
+                    )
+                    Text(
+                        text = "⚡ Challenge: $challengeStr",
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = interFamily
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "🔥 Streak Lost: $streakLostStr",
+                        color = Color(0xFFFF8A3D),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = interFamily
+                    )
+                    Text(
+                        text = "💪 Penalty: $punishmentStr",
+                        color = crimson,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = interFamily
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Highlighted Quote / Caption Box
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(crimson.copy(alpha = 0.15f), Color(0xFF26101D))
+                        )
+                    )
+                    .border(1.dp, crimson.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = "“$captionStr”",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = interFamily
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Reaction Pills Bar (Gen Z Roasts & Nudges)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val reactionsList = if (item.reactions.isEmpty()) {
+                        listOf("💀" to 12, "😂" to 7, "🤡" to 4, "🚨" to 8)
+                    } else {
+                        item.reactions
+                    }
+                    reactionsList.forEach { (emoji, count) ->
+                        ReactionPill(
+                            emoji = emoji,
+                            count = count,
+                            onClick = { onReactionClick(emoji) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ReactionPill(
     emoji: String,
     count: Int,
@@ -814,7 +1073,12 @@ data class FeedItem(
     val badgeColor: Color,
     val content: String,
     val reactions: List<Pair<String, Int>>,
-    val avatarBorderColor: Color
+    val avatarBorderColor: Color,
+    val isShameReceipt: Boolean = false,
+    val missedTime: String = "",
+    val challengeName: String = "",
+    val punishmentText: String = "",
+    val shameCaption: String = ""
 )
 
 private fun formatTimeAgo(timestamp: Long): String {

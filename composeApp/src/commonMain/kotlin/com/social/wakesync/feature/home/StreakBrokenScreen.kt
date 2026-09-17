@@ -46,6 +46,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.social.wakesync.ui.theme.AppColorPalette
 
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
 @Composable
 fun StreakBrokenScreen(
     previousStreak: Int = 23,
@@ -54,10 +59,22 @@ fun StreakBrokenScreen(
     punishmentDetail: String = "Photo proof required · Due 8:30 AM",
     onCompletePunishment: () -> Unit = {},
     onUseInsurance: () -> Unit = {},
+    onBroadcastShame: (String) -> Unit = {},
     onBackToHome: () -> Unit = {},
     titleFamily: FontFamily,
     interFamily: FontFamily,
 ) {
+    var customCaption by remember { mutableStateOf("") }
+    var isBroadcasted by remember { mutableStateOf(false) }
+    val memePresets = remember {
+        listOf(
+            "Caught sleeping in 4K 💀",
+            "Defaulted on wake duty 📢",
+            "Down bad: 10m alarm 🚨",
+            "Absolute tragedy 📉"
+        )
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "streak_broken")
 
     // Broken heart pulse — slow, heavy beat
@@ -284,6 +301,125 @@ fun StreakBrokenScreen(
                     fontWeight = FontWeight.W500,
                     fontFamily = interFamily
                 )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 🔥 Broadcast Shame Card to Social Penalty Wall
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF1D0E19))
+                    .border(1.dp, AppColorPalette.LossRed.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "🔥 BROADCAST TO PENALTY WALL",
+                        color = AppColorPalette.LossRed,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.W800,
+                        fontFamily = interFamily,
+                        letterSpacing = 1.sp
+                    )
+                    if (isBroadcasted) {
+                        Text(
+                            text = "RECEIPT SENT 📡",
+                            color = Color(0xFF00FF94),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = interFamily
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Meme preset chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    memePresets.take(2).forEach { preset ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White.copy(alpha = 0.05f))
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                                .clickable { customCaption = preset }
+                                .padding(vertical = 6.dp, horizontal = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = preset,
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = interFamily,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = customCaption,
+                    onValueChange = { customCaption = it },
+                    placeholder = {
+                        Text(
+                            "Add a shameful caption...",
+                            color = Color.White.copy(alpha = 0.3f),
+                            fontSize = 12.sp,
+                            fontFamily = interFamily
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Black.copy(alpha = 0.4f),
+                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                        focusedIndicatorColor = AppColorPalette.LossRed,
+                        unfocusedIndicatorColor = Color.White.copy(alpha = 0.1f),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = {
+                        onBroadcastShame(customCaption)
+                        isBroadcasted = true
+                    },
+                    enabled = !isBroadcasted,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isBroadcasted) Color(0xFF005C3E) else AppColorPalette.LossRed,
+                        disabledContainerColor = Color(0xFF005C3E)
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = if (isBroadcasted) "Posted to Feed! 📡" else "🚀 Broadcast Receipt Card",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = interFamily
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
