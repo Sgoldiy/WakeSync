@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,45 +37,42 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.feature.games.ChainMemoryGame
+import com.social.wakesync.feature.games.GameSounds
 import com.social.wakesync.feature.games.ColorClashGame
+import com.social.wakesync.feature.games.NumberHuntGame
+import com.social.wakesync.feature.games.NumberSequenceGame
 import com.social.wakesync.feature.games.OddOneOutGame
 import com.social.wakesync.feature.games.OrbFocusGame
-import com.social.wakesync.feature.games.PatternMemoryGame
 import com.social.wakesync.feature.games.RapidBedTapGame
+import com.social.wakesync.feature.games.ReactionRushGame
 import com.social.wakesync.feature.games.ShakeEnergyGame
 import com.social.wakesync.feature.games.SlidingTilesGame
-import com.social.wakesync.feature.games.SpeedMathGame
 import com.social.wakesync.feature.games.SpeedTapGame
-import com.social.wakesync.feature.games.WordScrambleGame
+import com.social.wakesync.feature.games.TargetTapGame
 import com.social.wakesync.ui.theme.AppColorPalette
 import kotlinx.coroutines.delay
 
 /**
- * Full-screen practice demo arcade. Every game is fully playable, and on success
- * the player gets a "Play Again" screen so they can instantly replay with a brand-new
- * randomly generated task (no repeats between rounds).
+ * Full-screen practice demo — plays ONE game at a time (the one the user tapped 🎮 Try on).
+ * Stopwatch + victory panel with Play Again (fresh random task each round).
  */
 @Composable
 fun GameDemoScreen(
     onDismiss: () -> Unit,
     titleFamily: FontFamily,
     interFamily: FontFamily,
-    challengeName: String,
-    mathDifficulty: String = "Medium"
+    gameName: String
 ) {
     val haptic = LocalHapticFeedback.current
+    val game = remember(gameName) { gameName.ifEmpty { "Memory Chain" } }
 
-    // Resolved once per entry; "Mystery" picks a random game.
-    val puzzleType = remember(challengeName) { getPuzzleTypeFromName(challengeName) }
-
-    // Round counter — bumping it re-seeds every game's `remember(round)` state,
-    // so each replay generates a completely fresh random task.
-    var round by remember { mutableIntStateOf(1) }
-    var solved by remember { mutableStateOf(false) }
+    // Round bumps re-seed the game's random state (fresh task every replay).
+    var round by remember(game) { mutableIntStateOf(1) }
+    var solved by remember(game) { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableIntStateOf(0) }
 
-    // Stop-watch: runs while playing, freezes on solve.
-    LaunchedEffect(round, solved) {
+    LaunchedEffect(game, round, solved) {
         elapsedSeconds = 0
         while (!solved) {
             delay(1000)
@@ -83,7 +81,7 @@ fun GameDemoScreen(
     }
 
     val onSolved: () -> Unit = {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        GameSounds.spark()
         solved = true
     }
 
@@ -101,7 +99,7 @@ fun GameDemoScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ── Top Bar: Exit + Game identity + stopwatch ──────────────────────────
+            // ── Top Bar: Exit + PRACTICE DEMO badge ────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -122,7 +120,6 @@ fun GameDemoScreen(
                     Text("←", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Text("Exit", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
                 }
-
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
@@ -132,14 +129,12 @@ fun GameDemoScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(puzzleType.emoji, fontSize = 14.sp)
+                    Text(gameEmojiFor(game), fontSize = 14.sp)
                     Text(
-                        text = "PRACTICE DEMO",
+                        "PRACTICE DEMO",
                         color = AppColorPalette.CyanCta,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = titleFamily,
-                        letterSpacing = 1.sp
+                        fontSize = 11.sp, fontWeight = FontWeight.Black,
+                        fontFamily = titleFamily, letterSpacing = 1.sp
                     )
                 }
             }
@@ -150,29 +145,24 @@ fun GameDemoScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.padding(top = 10.dp)
             ) {
-                Text(
-                    text = puzzleType.displayName,
-                    color = Color.White,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.W900,
-                    fontFamily = titleFamily
-                )
-                Text(
-                    text = "⏱️ ${elapsedSeconds}s · Round $round",
-                    color = AppColorPalette.CyanCta,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = interFamily
-                )
+                if (solved) {
+                    Text("🏆 SOLVED!", color = AppColorPalette.WinGreen, fontSize = 32.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
+                    Text("⏱️ $elapsedSeconds s", color = AppColorPalette.CyanCta, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = interFamily)
+                } else {
+                    Text(
+                        game,
+                        color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily
+                    )
+                    Text("⏱️ ${elapsedSeconds}s", color = AppColorPalette.CyanCta, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = interFamily)
+                }
             }
 
             // ── Play Area ──────────────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 if (solved) {
                     VictoryPanel(
-                        puzzleType = puzzleType,
+                        game = game,
                         elapsedSeconds = elapsedSeconds,
-                        round = round,
                         onPlayAgain = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             round++
@@ -186,55 +176,88 @@ fun GameDemoScreen(
                     AnimatedContent(
                         targetState = round,
                         transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) },
-                        label = "game_round_transition"
+                        label = "demo_round_transition"
                     ) { roundKey ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Text(
-                                text = "SOLVE IT — FULL GAME, REAL RULES",
-                                color = Color.White.copy(alpha = 0.4f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontFamily = interFamily,
-                                letterSpacing = 1.sp
-                            )
-                            when (puzzleType) {
-                                SoloPuzzleType.MATH -> SpeedMathGame(stage = roundKey, onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily)
-                                SoloPuzzleType.MEMORY -> PatternMemoryGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily, round = roundKey)
-                                SoloPuzzleType.STROOP -> ColorClashGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily)
-                                SoloPuzzleType.WORD_UNSCRAMBLE -> WordScrambleGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily, round = roundKey)
-                                SoloPuzzleType.SHAKE -> ShakeEnergyGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily)
-                                SoloPuzzleType.NUMBER_ORDER -> SpeedTapGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily, round = roundKey)
-                                SoloPuzzleType.ODD_ONE_OUT -> OddOneOutGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily, round = roundKey)
-                                SoloPuzzleType.SLIDING_TILE -> SlidingTilesGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily, round = roundKey)
-                                SoloPuzzleType.BALANCE_MAZE -> OrbFocusGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily)
-                                SoloPuzzleType.BED_TAP -> RapidBedTapGame(onSuccess = onSolved, titleFamily = titleFamily, interFamily = interFamily)
-                            }
-                        }
+                        GameRouter(
+                            gameName = game,
+                            round = roundKey,
+                            onSuccess = onSolved,
+                            titleFamily = titleFamily,
+                            interFamily = interFamily
+                        )
                     }
                 }
             }
 
-            // ── Bottom hint ────────────────────────────────────────────────────────
             Text(
                 text = "🎮 This is exactly what will greet you when the alarm fires",
                 color = Color.White.copy(alpha = 0.35f),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = interFamily,
+                fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily,
                 modifier = Modifier.padding(bottom = 18.dp)
             )
         }
     }
 }
 
+/** Routes a game name to its composable — the single source of truth used by demo & alarm lock. */
+@Composable
+fun GameRouter(
+    gameName: String,
+    round: Int,
+    onSuccess: () -> Unit,
+    titleFamily: FontFamily,
+    interFamily: FontFamily
+) {
+    val n = gameName.trim()
+    when {
+        n.contains("Memory Chain", ignoreCase = true) || n.contains("Chain", ignoreCase = true) ->
+            ChainMemoryGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Sequence", ignoreCase = true) ->
+            key(round) { NumberSequenceGame(onGameCompleted = onSuccess, titleFamily = titleFamily, interFamily = interFamily) }
+        n.contains("Stroop", ignoreCase = true) || n.contains("Color", ignoreCase = true) ->
+            ColorClashGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Target", ignoreCase = true) ->
+            key(round) { TargetTapGame(onGameCompleted = onSuccess, titleFamily = titleFamily, interFamily = interFamily) }
+        n.contains("Shake", ignoreCase = true) || n.contains("Charge", ignoreCase = true) ->
+            ShakeEnergyGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Speed Tap", ignoreCase = true) || n.contains("Tap 1", ignoreCase = true) ->
+            SpeedTapGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Odd", ignoreCase = true) ->
+            OddOneOutGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Sliding", ignoreCase = true) || n.contains("Tile", ignoreCase = true) ->
+            SlidingTilesGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Orb", ignoreCase = true) || n.contains("Focus", ignoreCase = true) ->
+            OrbFocusGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Rapid", ignoreCase = true) || n.contains("Sprint", ignoreCase = true) || n.contains("Bed Tap", ignoreCase = true) ->
+            RapidBedTapGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Reaction", ignoreCase = true) ->
+            ReactionRushGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        n.contains("Number Hunt", ignoreCase = true) || n.contains("Hunt", ignoreCase = true) ->
+            NumberHuntGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+        else -> ChainMemoryGame(onSuccess = onSuccess, round = round, titleFamily = titleFamily, interFamily = interFamily)
+    }
+}
+
+fun gameEmojiFor(name: String): String = when {
+    name.contains("Memory Chain", true) || name.contains("Chain", true) -> "🧠"
+    name.contains("Pattern", true) || name.contains("Sequence", true) -> "🧩"
+    name.contains("Stroop", true) || name.contains("Color", true) || name.contains("Target", true) -> "🎯"
+    name.contains("Word", true) -> "🔤"
+    name.contains("Shake", true) || name.contains("Charge", true) -> "📱"
+    name.contains("Speed Tap", true) -> "🔢"
+    name.contains("Odd", true) -> "🔍"
+    name.contains("Sliding", true) || name.contains("Tile", true) -> "🧱"
+    name.contains("Orb", true) || name.contains("Focus", true) -> "🎯"
+    name.contains("Rapid", true) || name.contains("Sprint", true) -> "👆"
+    name.contains("Reaction", true) -> "⚡"
+    name.contains("Hunt", true) -> "🧮"
+    else -> "🎮"
+}
+
 @Composable
 private fun VictoryPanel(
-    puzzleType: SoloPuzzleType,
+    game: String,
     elapsedSeconds: Int,
-    round: Int,
     onPlayAgain: () -> Unit,
     onExit: () -> Unit,
     titleFamily: FontFamily,
@@ -245,22 +268,8 @@ private fun VictoryPanel(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         Text("🏆", fontSize = 72.sp)
-        Text(
-            text = "SOLVED!",
-            color = AppColorPalette.WinGreen,
-            fontSize = 40.sp,
-            fontWeight = FontWeight.W900,
-            fontFamily = titleFamily
-        )
-        Text(
-            text = "${puzzleType.emoji} ${puzzleType.displayName} · $elapsedSeconds s",
-            color = Color.White.copy(alpha = 0.7f),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = interFamily
-        )
-
-        // Play Again → re-seeds the game with a fresh random task
+        Text("SOLVED!", color = AppColorPalette.WinGreen, fontSize = 40.sp, fontWeight = FontWeight.W900, fontFamily = titleFamily)
+        Text("$game · $elapsedSeconds s", color = Color.White.copy(alpha = 0.7f), fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily)
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
@@ -269,21 +278,11 @@ private fun VictoryPanel(
                 .padding(horizontal = 32.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "🔁 Play Again",
-                color = Color.Black,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = titleFamily
-            )
+            Text("🔁 Play Again", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Black, fontFamily = titleFamily)
         }
-
         Text(
-            text = "← Back to alarm setup",
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = interFamily,
+            "← Back to alarm setup",
+            color = Color.White.copy(alpha = 0.5f), fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = interFamily,
             modifier = Modifier.clickable { onExit() }
         )
     }

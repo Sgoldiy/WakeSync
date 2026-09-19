@@ -32,39 +32,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import com.social.wakesync.feature.games.GameSounds
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.social.wakesync.feature.games.ColorClashGame
-import com.social.wakesync.feature.games.OddOneOutGame
-import com.social.wakesync.feature.games.OrbFocusGame
-import com.social.wakesync.feature.games.PatternMemoryGame
-import com.social.wakesync.feature.games.RapidBedTapGame
-import com.social.wakesync.feature.games.ShakeEnergyGame
-import com.social.wakesync.feature.games.SlidingTilesGame
-import com.social.wakesync.feature.games.SpeedMathGame
-import com.social.wakesync.feature.games.SpeedTapGame
-import com.social.wakesync.feature.games.WordScrambleGame
 import com.social.wakesync.ui.theme.AppColorPalette
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
-
-enum class SoloPuzzleType(val displayName: String, val emoji: String) {
-    MATH("Speed Math", "🧮"),            // 1. Math Game
-    MEMORY("Pattern Memory", "🧩"),        // 2. 3x3 Flashing Pattern Recall
-    STROOP("Color Clash", "🎨"),           // 3. Stroop Color Conflict Test
-    WORD_UNSCRAMBLE("Word Scramble", "🔤"), // 4. Anagram Unscramble
-    SHAKE("Shake Energy", "📱"),          // 5. Rapid Motion Energy Bar
-    NUMBER_ORDER("Speed Tap 1-6", "🔢"),   // 6. 1-to-6 Ascending Tap
-    ODD_ONE_OUT("Odd One Out", "🔍"),      // 7. Visual Intruder Search
-    SLIDING_TILE("Sliding Tiles", "🧱"),    // 8. 1-2-3 Tile Sequence Arrange
-    BALANCE_MAZE("Orb Focus", "🎯"),        // 9. Bed-friendly Orb Center Touch Focus
-    BED_TAP("Rapid Bed Tap", "👆")         // 10. Bed-friendly Finger Tap Sprint
-}
 
 @Composable
 fun AlarmPuzzleSolo(
@@ -72,32 +50,24 @@ fun AlarmPuzzleSolo(
     onFailure: () -> Unit = {},
     titleFamily: FontFamily,
     interFamily: FontFamily,
-    challengeName: String = "Math",
-    mathDifficulty: String = "Medium",
+    challengeName: String = "Memory Chain,Color Clash,Speed Tap",
     isPracticeDemo: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     var timeString by remember { mutableStateOf("06:30") }
-    var currentStage by remember { mutableIntStateOf(1) }
+
+    // ── 3-Game Ladder: the alarm is dismissed only after ALL selected games are solved.
+    val soloLadder = remember(challengeName) {
+        AlarmState.activeAlarmGames.ifEmpty { challengeName.split(",").map { it.trim() }.filter { it.isNotEmpty() } }
+            .ifEmpty { listOf("Memory Chain", "Color Clash", "Speed Tap") }
+    }
+    var currentGame by remember(soloLadder) { mutableIntStateOf(1) } // 1-based
+    var ladderRound by remember(soloLadder) { mutableIntStateOf(1) } // bumps to re-seed randomness
 
     var attemptNumber by remember { mutableIntStateOf(1) } // 1 or 2
     var secondsLeft by remember { mutableIntStateOf(60) }
-    var activePuzzleType by remember(challengeName) {
-        mutableStateOf(getPuzzleTypeFromName(challengeName))
-    }
-
-    val totalStages = remember(activePuzzleType, mathDifficulty) {
-        if (activePuzzleType == SoloPuzzleType.MATH) {
-            when (mathDifficulty) {
-                "Easy" -> 1
-                "Hard" -> 3
-                else -> 2
-            }
-        } else {
-            1
-        }
-    }
+    val totalStages = soloLadder.size
 
     // Dynamic Clock Updater
     LaunchedEffect(Unit) {
@@ -112,7 +82,7 @@ fun AlarmPuzzleSolo(
     }
 
     // 60-Second Countdown Timer Loop (Disabled in Practice Demo Mode)
-    LaunchedEffect(attemptNumber, activePuzzleType, currentStage, isPracticeDemo) {
+    LaunchedEffect(attemptNumber, currentGame, isPracticeDemo) {
         if (!isPracticeDemo) {
             secondsLeft = 60
             while (secondsLeft > 0) {
@@ -123,9 +93,8 @@ fun AlarmPuzzleSolo(
             if (attemptNumber == 1) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 attemptNumber = 2
-                currentStage = 1
-                val availablePuzzles = SoloPuzzleType.values().filter { it != activePuzzleType }
-                activePuzzleType = availablePuzzles.random()
+                currentGame = 1
+                ladderRound++
             } else {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onFailure()
@@ -134,11 +103,13 @@ fun AlarmPuzzleSolo(
     }
 
     val onStageSuccess = {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        if (currentStage >= totalStages) {
+        if (currentGame >= totalStages) {
+            GameSounds.spark() // final game solved — alarm dismissed!
             onDismiss()
         } else {
-            currentStage++
+            GameSounds.chime() // ladder advance
+            currentGame++
+            ladderRound++
         }
     }
 
@@ -252,12 +223,9 @@ fun AlarmPuzzleSolo(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(text = activePuzzleType.emoji, fontSize = 16.sp)
+                Text(text = gameEmojiFor(soloLadder[currentGame - 1]), fontSize = 16.sp)
                 Text(
-                    text = if (activePuzzleType == SoloPuzzleType.MATH) 
-                        "${activePuzzleType.displayName} · Question $currentStage of $totalStages"
-                    else 
-                        "${activePuzzleType.displayName} Challenge",
+                    text = "${soloLadder[currentGame - 1]} · Game $currentGame of $totalStages",
                     color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -265,8 +233,8 @@ fun AlarmPuzzleSolo(
                 )
             }
 
-            // Progress Bar (Only for multi-question Math)
-            if (activePuzzleType == SoloPuzzleType.MATH && totalStages > 1) {
+            // 3-Game Ladder Progress Bar
+            if (totalStages > 1) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
@@ -276,8 +244,8 @@ fun AlarmPuzzleSolo(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     for (stage in 1..totalStages) {
-                        val isDone = stage < currentStage
-                        val isCurrent = stage == currentStage
+                        val isDone = stage < currentGame
+                        val isCurrent = stage == currentGame
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -304,41 +272,21 @@ fun AlarmPuzzleSolo(
                 letterSpacing = 1.sp
             )
 
-            // Active Task Component - Routed to Standalone Game Files
+            // Active Task Component — runs the user's selected game for this stage of the ladder
             AnimatedContent(
-                targetState = Pair(activePuzzleType, currentStage),
+                targetState = currentGame to ladderRound,
                 transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) },
                 label = "task_transition"
-            ) { (_, stage) ->
-                when (activePuzzleType) {
-                    SoloPuzzleType.MATH -> SpeedMathGame(stage = stage, onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.MEMORY -> PatternMemoryGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.STROOP -> ColorClashGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.WORD_UNSCRAMBLE -> WordScrambleGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.SHAKE -> ShakeEnergyGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.NUMBER_ORDER -> SpeedTapGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.ODD_ONE_OUT -> OddOneOutGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.SLIDING_TILE -> SlidingTilesGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.BALANCE_MAZE -> OrbFocusGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                    SoloPuzzleType.BED_TAP -> RapidBedTapGame(onSuccess = { onStageSuccess() }, titleFamily = titleFamily, interFamily = interFamily)
-                }
+            ) { (_, roundKey) ->
+                GameRouter(
+                    gameName = soloLadder[currentGame - 1],
+                    round = roundKey,
+                    onSuccess = { onStageSuccess() },
+                    titleFamily = titleFamily,
+                    interFamily = interFamily
+                )
             }
         }
     }
 }
 
-internal fun getPuzzleTypeFromName(name: String): SoloPuzzleType {
-    val clean = name.trim()
-    return when {
-        clean.contains("Memory", ignoreCase = true) -> SoloPuzzleType.MEMORY
-        clean.contains("Stroop", ignoreCase = true) || clean.contains("Color", ignoreCase = true) -> SoloPuzzleType.STROOP
-        clean.contains("Word", ignoreCase = true) || clean.contains("Scramble", ignoreCase = true) -> SoloPuzzleType.WORD_UNSCRAMBLE
-        clean.contains("Shake", ignoreCase = true) -> SoloPuzzleType.SHAKE
-        clean.contains("Speed Tap", ignoreCase = true) || clean.contains("Tap 1-6", ignoreCase = true) || clean.contains("Order", ignoreCase = true) -> SoloPuzzleType.NUMBER_ORDER
-        clean.contains("Odd", ignoreCase = true) || clean.contains("Intruder", ignoreCase = true) -> SoloPuzzleType.ODD_ONE_OUT
-        clean.contains("Sliding", ignoreCase = true) || clean.contains("Tile", ignoreCase = true) -> SoloPuzzleType.SLIDING_TILE
-        clean.contains("Orb", ignoreCase = true) || clean.contains("Focus", ignoreCase = true) || clean.contains("Balance", ignoreCase = true) -> SoloPuzzleType.BALANCE_MAZE
-        clean.contains("Rapid", ignoreCase = true) || clean.contains("Bed", ignoreCase = true) -> SoloPuzzleType.BED_TAP
-        else -> SoloPuzzleType.MATH
-    }
-}

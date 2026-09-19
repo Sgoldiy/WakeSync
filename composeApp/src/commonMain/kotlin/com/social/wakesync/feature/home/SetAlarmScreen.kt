@@ -5,6 +5,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,6 +29,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -89,10 +94,11 @@ fun SetAlarmScreen(
     var selectedHour by remember { mutableIntStateOf(6) }
     var selectedMinute by remember { mutableIntStateOf(30) }
     var selectedMode by remember { mutableStateOf(if (preselectedRival != null) "Duo" else "Solo") }
-    var selectedChallenge by remember { mutableStateOf("Math") }
+    // User must pick exactly 3 wake-up games — solved in order to dismiss the alarm.
+    // No games pre-selected — the user chooses exactly 3 themselves.
+    val selectedGames = remember { mutableStateListOf<String>() }
     var selectedCategoryFilter by remember { mutableStateOf("ALL") }
     var demoGameTarget by remember { mutableStateOf<GenZGameItem?>(null) }
-    var selectedMathDifficulty by remember { mutableStateOf("Medium") }
     val selectedDays = remember { mutableStateListOf(0, 1, 2, 3, 4) }
     var selectedPenalty by remember { mutableStateOf("shame") }
     var bondName by remember { mutableStateOf("") }
@@ -176,6 +182,7 @@ fun SetAlarmScreen(
             interFamily = interFamily
         )
     } else {
+        Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = AppColorPalette.VoidBg,
         topBar = {
@@ -460,8 +467,8 @@ fun SetAlarmScreen(
                 ) {
                     SectionHeader("CHALLENGE", interFamily)
                     Text(
-                        text = if (selectedChallenge == "Mystery") "🎰 Random Morning Chaos" else "SELECT GAME",
-                        color = if (selectedChallenge == "Mystery") AppColorPalette.GoldPremium else AppColorPalette.CyanCta,
+                        text = "PICK 3 GAMES",
+                        color = AppColorPalette.CyanCta,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = interFamily
@@ -476,7 +483,7 @@ fun SetAlarmScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        "ALL" to "All (11)",
+                        "ALL" to "All (12)",
                         "BRAIN" to "🧠 Brain",
                         "REFLEX" to "⚡ Reflex",
                         "BED" to "🛏️ In-Bed"
@@ -509,97 +516,114 @@ fun SetAlarmScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Gen Z Game Cards Carousel
-                val filteredGames = remember(selectedCategoryFilter) {
-                    val allGames = listOf(
-                        GenZGameItem("Mystery", "Daily Mystery", "🎰", "🎲 Daily Chaos", "SPECIAL", "Surprise", AppColorPalette.GoldPremium),
-                        GenZGameItem("Math", "Speed Math", "🧮", "🧠 Mind Melt", "BRAIN", "15–30s", AppColorPalette.CyanCta),
-                        GenZGameItem("Memory", "Pattern Memory", "🧩", "🧠 Recall Test", "BRAIN", "20s", Color(0xFFA855F7)),
+                // Game Picker — 12 games, 3 swipeable pages of 4; user picks exactly 3 (none pre-selected)
+                val allGames = remember {
+                    listOf(
+                        GenZGameItem("Memory Chain", "Memory Chain", "🧠", "🧠 Simon Says", "BRAIN", "20s", AppColorPalette.CyanCta),
+                        GenZGameItem("Number Sequence", "Number Sequence", "🧩", "🧩 Sequences", "BRAIN", "20s", Color(0xFFA855F7)),
                         GenZGameItem("Stroop", "Color Clash", "🎨", "🧠 Stroop Shock", "BRAIN", "15s", AppColorPalette.LossRed),
-                        GenZGameItem("Word Scramble", "Word Scramble", "🔤", "🧠 Anagram Race", "BRAIN", "25s", AppColorPalette.GoldPremium),
+                        GenZGameItem("Target Tap", "Target Tap", "🎯", "🎯 Selective Focus", "BRAIN", "25s", AppColorPalette.GoldPremium),
+                        GenZGameItem("Sliding Tiles", "Sliding Tiles", "🧱", "🧠 Tile Slide", "BRAIN", "25s", AppColorPalette.GoldPremium),
+                        GenZGameItem("Number Hunt", "Number Hunt", "🧮", "🧠 Math Hunt", "BRAIN", "20s", Color(0xFFA855F7)),
+                        GenZGameItem("Speed Tap", "Speed Tap 1–9", "🔢", "⚡ Ascending", "REFLEX", "20s", AppColorPalette.CyanCta),
+                        GenZGameItem("Odd One Out", "Odd One Out", "🔍", "⚡ Search", "REFLEX", "20s", Color(0xFFA855F7)),
+                        GenZGameItem("Reaction", "Reaction Rush", "⚡", "⚡ Go/No-Go", "REFLEX", "15s", AppColorPalette.LossRed),
                         GenZGameItem("Shake", "Shake Energy", "📱", "🛏️ Charge Bar", "BED", "10s", AppColorPalette.WinGreen),
-                        GenZGameItem("Speed Tap", "Speed Tap 1-6", "🔢", "⚡ Ascending", "REFLEX", "12s", AppColorPalette.CyanCta),
-                        GenZGameItem("Odd One Out", "Odd One Out", "🔍", "⚡ Search", "REFLEX", "10s", Color(0xFFA855F7)),
-                        GenZGameItem("Sliding Tiles", "Sliding Tiles", "🧱", "🧠 Tile Order", "BRAIN", "25s", AppColorPalette.GoldPremium),
                         GenZGameItem("Orb Focus", "Orb Focus", "🎯", "🛏️ Bed Touch", "BED", "15s", AppColorPalette.WinGreen),
-                        GenZGameItem("Rapid Tap", "Rapid Bed Tap", "👆", "🛏️ Tap Sprint", "BED", "10s", AppColorPalette.CyanCta)
+                        GenZGameItem("Rapid Tap", "Thumb Sprint", "👆", "🛏️ Tap Sprint", "BED", "15s", AppColorPalette.CyanCta)
                     )
-                    if (selectedCategoryFilter == "ALL") {
-                        allGames
-                    } else {
-                        allGames.filter { it.category == selectedCategoryFilter || it.category == "SPECIAL" }
-                    }
+                }
+                val filteredGames = remember(selectedCategoryFilter, allGames) {
+                    if (selectedCategoryFilter == "ALL") allGames
+                    else allGames.filter { it.category == selectedCategoryFilter }
                 }
 
-                LazyRow(
+                // Selection counter
+                val selCount = selectedGames.size
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(filteredGames) { game ->
-                        GenZGameCard(
-                            game = game,
-                            isSelected = selectedChallenge == game.id,
-                            onClick = { selectedChallenge = game.id },
-                            onDemoClick = { demoGameTarget = game },
-                            interFamily = interFamily
-                        )
-                    }
+                    Text(
+                        text = if (selCount < 3) "Pick ${3 - selCount} more game${if (3 - selCount == 1) "" else "s"} to continue"
+                               else "Ladder ready — solve all 3 to dismiss! 🔥",
+                        color = if (selCount < 3) AppColorPalette.GoldPremium else AppColorPalette.WinGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = interFamily
+                    )
+                    Text(
+                        text = "$selCount / 3",
+                        color = if (selCount == 3) AppColorPalette.WinGreen else AppColorPalette.CyanCta,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = interFamily
+                    )
                 }
 
-                // ONLY Math displays the Level 1, Level 2, Level 3 sub-selector bar!
-                if (selectedChallenge == "Math") {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF0F1322))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-                            .padding(6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(
-                            "Level 1" to "1 Qs",
-                            "Level 2" to "2 Qs",
-                            "Level 3" to "3 Qs"
-                        ).forEachIndexed { idx, (lvl, desc) ->
-                            val levelNum = idx + 1
-                            val isSel = (selectedMathDifficulty == "Easy" && levelNum == 1) ||
-                                        (selectedMathDifficulty == "Medium" && levelNum == 2) ||
-                                        (selectedMathDifficulty == "Hard" && levelNum == 3)
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSel) AppColorPalette.CyanCta.copy(alpha = 0.15f) else Color.Transparent)
-                                    .then(if (isSel) Modifier.border(1.dp, AppColorPalette.CyanCta, RoundedCornerShape(10.dp)) else Modifier)
-                                    .clickable {
-                                        selectedMathDifficulty = when (levelNum) {
-                                            1 -> "Easy"
-                                            3 -> "Hard"
-                                            else -> "Medium"
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = lvl,
-                                        color = if (isSel) AppColorPalette.CyanCta else Color.White.copy(alpha = 0.8f),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = interFamily
-                                    )
-                                    Text(
-                                        text = desc,
-                                        color = if (isSel) AppColorPalette.CyanCta.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.35f),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        fontFamily = interFamily
-                                    )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Swipeable pager — 4 games per page, 3 pages total (swipe left/right)
+                val pagerGames = filteredGames.chunked(4)
+                val pagerState = rememberPagerState(pageCount = { pagerGames.size })
+
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxWidth(),
+                    pageSpacing = 12.dp
+                ) { page ->
+                    val pageGames = pagerGames.getOrElse(page) { emptyList() }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        pageGames.chunked(2).forEach { rowGames ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                rowGames.forEach { game ->
+                                    Box(modifier = Modifier.weight(1f).height(150.dp)) {
+                                        val slot = selectedGames.indexOf(game.id)
+                                        GenZGameCard(
+                                            game = game,
+                                            isSelected = slot != -1,
+                                            selectionSlot = if (slot != -1) slot + 1 else null,
+                                            onClick = {
+                                                if (selectedGames.contains(game.id)) {
+                                                    selectedGames.remove(game.id)
+                                                } else if (selectedGames.size < 3) {
+                                                    selectedGames.add(game.id)
+                                                }
+                                            },
+                                            onDemoClick = { demoGameTarget = game },
+                                            interFamily = interFamily
+                                        )
+                                    }
+                                }
+                                // Fill trailing space on odd-sized rows
+                                repeat(2 - rowGames.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Page dots
+                if (pagerGames.size > 1) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(pagerGames.size) { i ->
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .size(if (i == pagerState.currentPage) 8.dp else 6.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (i == pagerState.currentPage) AppColorPalette.CyanCta
+                                        else Color.White.copy(alpha = 0.2f)
+                                    )
+                            )
                         }
                     }
                 }
@@ -733,6 +757,10 @@ fun SetAlarmScreen(
                             showAddParticipantsSheet = true
                             return@Button
                         }
+                        // Enforce exactly 3 games selected
+                        if (selectedGames.size != 3) {
+                            return@Button
+                        }
 
                         onSave(
                             selectedHour,
@@ -740,7 +768,7 @@ fun SetAlarmScreen(
                             isAm,
                             selectedDays.toList(),
                             selectedMode,
-                            selectedChallenge,
+                            selectedGames.joinToString(","),
                             selectedParticipants.joinToString(","),
                             if (selectedMode != "Solo" && bondName.isNotBlank()) bondName else null
                         )
@@ -807,21 +835,14 @@ fun SetAlarmScreen(
         // ── FULL-SCREEN PRACTICE DEMO OVERLAY ─────────────────────────────────────
         // Renders on top of the entire SetAlarm screen when the user taps 🎮 Try.
         demoGameTarget?.let { game ->
-            val challengeName = if (game.id == "Mystery") {
-                listOf("Math", "Memory", "Stroop", "Word Scramble", "Shake", "Speed Tap", "Odd One Out", "Sliding Tiles", "Orb Focus", "Rapid Tap").random()
-            } else {
-                game.id
-            }
-            Box(modifier = Modifier.fillMaxSize()) {
-                GameDemoScreen(
-                    onDismiss = { demoGameTarget = null },
-                    titleFamily = titleFamily,
-                    interFamily = interFamily,
-                    challengeName = challengeName,
-                    mathDifficulty = selectedMathDifficulty
-                )
-            }
+            GameDemoScreen(
+                onDismiss = { demoGameTarget = null },
+                titleFamily = titleFamily,
+                interFamily = interFamily,
+                gameName = game.id
+            )
         }
+        } // end root Box overlay layer
     }
 }
 }
@@ -1294,43 +1315,32 @@ fun GenZGameCard(
     isSelected: Boolean,
     onClick: () -> Unit,
     onDemoClick: () -> Unit,
-    interFamily: FontFamily
+    interFamily: FontFamily,
+    selectionSlot: Int? = null
 ) {
     Box(
         modifier = Modifier
-            .width(162.dp)
-            .height(126.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .fillMaxSize()
+            .clip(RoundedCornerShape(16.dp))
             .background(
-                if (isSelected) game.accentColor.copy(alpha = 0.12f)
+                if (isSelected) game.accentColor.copy(alpha = 0.15f)
                 else Color(0xFF0F1322)
             )
             .border(
                 if (isSelected) 2.dp else 1.dp,
                 if (isSelected) game.accentColor else Color.White.copy(alpha = 0.08f),
-                RoundedCornerShape(20.dp)
+                RoundedCornerShape(16.dp)
             )
             .clickable { onClick() }
-            .padding(12.dp)
+            .padding(8.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Row: Tag & Checkmark Indicator
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = game.tag,
-                    color = if (isSelected) game.accentColor else Color.White.copy(alpha = 0.5f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = interFamily
-                )
-
+            // Top: slot badge (or spacer)
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
                 if (isSelected) {
                     Box(
                         modifier = Modifier
@@ -1339,85 +1349,50 @@ fun GenZGameCard(
                             .background(game.accentColor),
                         contentAlignment = Alignment.Center
                     ) {
+                        // Slot number = order in the 3-game ladder
                         Text(
-                            text = "✓",
+                            text = selectionSlot?.toString() ?: "✓",
                             color = Color.Black,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Black
                         )
                     }
                 }
             }
 
-            // Middle Row: Big Emoji with halo + Game Title
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(game.accentColor.copy(alpha = 0.18f))
-                        .border(1.dp, game.accentColor.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = game.emoji,
-                        fontSize = 20.sp
-                    )
-                }
-
+            // Middle: emoji + compact title
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(text = game.emoji, fontSize = 22.sp)
                 Text(
                     text = game.name,
-                    color = Color.White,
-                    fontSize = 13.sp,
+                    color = if (isSelected) game.accentColor else Color.White,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.W800,
                     fontFamily = interFamily,
                     maxLines = 2,
-                    lineHeight = 15.sp
+                    lineHeight = 10.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
 
-            // Bottom Row: Time Badge & 🎮 Try Demo Button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Bottom: Try button (full-width pill)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(game.accentColor.copy(alpha = 0.18f))
+                    .border(1.dp, game.accentColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .clickable { onDemoClick() }
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.White.copy(alpha = 0.05f))
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "⏱️ ${game.estTime}",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = interFamily
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(game.accentColor.copy(alpha = 0.18f))
-                        .border(1.dp, game.accentColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        .clickable { onDemoClick() }
-                        .padding(horizontal = 7.dp, vertical = 3.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "🎮 Try",
-                        color = game.accentColor,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = interFamily
-                    )
-                }
+                Text(
+                    text = "🎮 Try",
+                    color = game.accentColor,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = interFamily
+                )
             }
         }
     }

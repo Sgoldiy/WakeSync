@@ -1,5 +1,10 @@
 package com.social.wakesync.feature.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +28,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.social.wakesync.feature.games.GameSounds
 import com.social.wakesync.ui.theme.AppColorPalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -53,9 +59,14 @@ fun AlarmPuzzleGroup(
         )
     }
 
-    var mathProblem by remember { mutableStateOf(generateGroupMathProblem()) }
-    var selectedOption by remember { mutableStateOf<Int?>(null) }
     var isUserDone by remember { mutableStateOf(false) }
+
+    // Group members all race through the alarm's selected 3-game ladder.
+    val groupLadder = remember {
+        AlarmState.activeAlarmGames.ifEmpty { listOf("Memory Chain", "Color Clash", "Speed Tap") }
+    }
+    var currentGame by remember { mutableIntStateOf(1) }
+    val activeGame = groupLadder[(currentGame - 1).coerceAtMost(groupLadder.lastIndex)]
 
     // Simulation of others solving in background
     LaunchedEffect(Unit) {
@@ -76,13 +87,12 @@ fun AlarmPuzzleGroup(
         }
     }
 
-    fun handleOptionSelected(option: Int) {
+    fun handleGameSolved() {
         if (isUserDone) return
-        selectedOption = option
-        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-
-        if (option == mathProblem.answer) {
+        GameSounds.chime()
+        if (currentGame >= groupLadder.size) {
             isUserDone = true
+            GameSounds.spark()
             // Update User status in list
             participants = participants.map {
                 if (it.id == "3") it.copy(state = GroupSolverState.Finished("1:14")) else it
@@ -92,7 +102,7 @@ fun AlarmPuzzleGroup(
                 onDismiss()
             }
         } else {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            currentGame++
         }
     }
 
@@ -146,95 +156,45 @@ fun AlarmPuzzleGroup(
             )
         }
 
-        // Math Puzzle Section
+        // Game ladder section — the same games as solo, raced together
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1.4f)
-                .padding(horizontal = 24.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Math Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(96.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF131829)),
-                border = BorderStroke(1.dp, AppColorPalette.CyanCta.copy(alpha = 0.15f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(gameEmojiFor(activeGame), fontSize = 15.sp)
                     Text(
-                        text = mathProblem.question,
-                        color = Color.White,
-                        fontSize = 44.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = titleFamily
+                        text = "Game $currentGame of ${groupLadder.size} — $activeGame",
+                        color = AppColorPalette.CyanCta,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = interFamily
                     )
                 }
             }
 
-            // Options grid
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                val row1 = mathProblem.options.take(2)
-                val row2 = mathProblem.options.drop(2)
-
-                listOf(row1, row2).forEach { rowOptions ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        rowOptions.forEach { option ->
-                            val isCorrect = option == mathProblem.answer
-                            val isSelectedValue = selectedOption == option
-
-                            val cardBorderColor = when {
-                                isSelectedValue && isCorrect -> AppColorPalette.WinGreen
-                                isSelectedValue && !isCorrect -> AppColorPalette.LossRed
-                                else -> Color.White.copy(alpha = 0.08f)
-                            }
-                            
-                            val cardBgColor = when {
-                                isSelectedValue && isCorrect -> AppColorPalette.WinGreen.copy(alpha = 0.08f)
-                                isSelectedValue && !isCorrect -> AppColorPalette.LossRed.copy(alpha = 0.08f)
-                                else -> Color(0xFF131829)
-                            }
-
-                            val textColor = when {
-                                isSelectedValue && isCorrect -> AppColorPalette.WinGreen
-                                isSelectedValue && !isCorrect -> AppColorPalette.LossRed
-                                else -> Color.White
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(56.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(cardBgColor)
-                                    .border(1.dp, cardBorderColor, RoundedCornerShape(16.dp))
-                                    .clickable(enabled = selectedOption == null) {
-                                        handleOptionSelected(option)
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = option.toString(),
-                                    color = textColor,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = titleFamily
-                                )
-                            }
-                        }
-                    }
+            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
+                AnimatedContent(
+                    targetState = currentGame,
+                    transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) },
+                    label = "group_task_transition"
+                ) { gameIdx ->
+                    GameRouter(
+                        gameName = groupLadder[(gameIdx - 1).coerceAtMost(groupLadder.lastIndex)],
+                        round = gameIdx * 7,
+                        onSuccess = { handleGameSolved() },
+                        titleFamily = titleFamily,
+                        interFamily = interFamily
+                    )
                 }
             }
         }
@@ -391,33 +351,4 @@ data class GroupParticipant(
 sealed interface GroupSolverState {
     data object Solving : GroupSolverState
     data class Finished(val time: String) : GroupSolverState
-}
-
-data class GroupMathProblem(
-    val question: String,
-    val answer: Int,
-    val options: List<Int>
-)
-
-fun generateGroupMathProblem(): GroupMathProblem {
-    // Generate subtraction problem e.g. 91 - 47
-    val num1 = (50..99).random()
-    val num2 = (11..49).random()
-    val answer = num1 - num2
-    
-    // Generate 3 incorrect options around the answer
-    val options = mutableSetOf(answer)
-    while (options.size < 4) {
-        val diff = listOf(-10, -5, -2, -1, 1, 2, 5, 10, 20).random()
-        val option = answer + diff
-        if (option > 0) {
-            options.add(option)
-        }
-    }
-    
-    return GroupMathProblem(
-        question = "$num1 - $num2",
-        answer = answer,
-        options = options.toList().shuffled()
-    )
 }
