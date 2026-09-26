@@ -775,6 +775,54 @@ class IosHomeRepository : HomeRepository {
         return Result.success(Unit)
     }
 
+    /**
+     * Auto-posts a "shame receipt" to the social feed when an alarm is missed.
+     * Mirrors Android's Firestore implementation using the iOS bridge.
+     */
+    override suspend fun postShameReceipt(
+        alarmTime: String,
+        challengeName: String,
+        streakLost: Int,
+        punishmentText: String,
+        customCaption: String?
+    ): Result<Unit> {
+        val now = Clock.System.now().toEpochMilliseconds()
+        val uid = getCurrentUserUid() ?: ""
+        val caption = customCaption ?: "@user slept through $alarmTime alarm 😴"
+        val content = "$caption · $challengeName · -$streakLost streak · $punishmentText"
+
+        val newPost = FeedPost(
+            id = "post_$now",
+            userId = uid,
+            username = "user",
+            avatar = "👤",
+            content = content,
+            badgeText = "loss",
+            badgeColorHex = "#FF3D71",
+            streak = 0,
+            createdAt = now,
+            reactions = emptyMap()
+        )
+        _feedPosts.value = listOf(newPost) + _feedPosts.value
+
+        bridge()?.addFeedPost(
+            data = mapOf(
+                "userId" to uid,
+                "username" to "user",
+                "avatar" to "👤",
+                "content" to content,
+                "badgeText" to "loss",
+                "badgeColorHex" to "#FF3D71",
+                "streak" to 0L,
+                "createdAt" to now,
+                "reactions" to emptyMap<String, Long>()
+            ),
+            onSuccess = {},
+            onError = {}
+        )
+        return Result.success(Unit)
+    }
+
     // ── Notifications (real Firestore) ───────────────────────────────────
 
     private val _notifications = MutableStateFlow(emptyList<FeedNotification>())

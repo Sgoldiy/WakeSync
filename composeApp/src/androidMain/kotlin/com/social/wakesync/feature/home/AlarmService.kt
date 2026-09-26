@@ -60,7 +60,6 @@ class AlarmService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) return START_NOT_STICKY
@@ -127,10 +126,8 @@ class AlarmService : Service() {
         acquireWakeLock(timeoutMs)
         startRinging(soundId)
         startVibrating()
-
         handler.removeCallbacks(autoStopRunnable)
         handler.postDelayed(autoStopRunnable, timeoutMs)
-
         return START_STICKY
     }
 
